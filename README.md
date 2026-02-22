@@ -116,5 +116,3 @@ sentinel/
 Built by the SENTINEL team at Hacking Health 2026, Columbia University.
 
 ---
-
-Built with Claude (Anthropic) at **Hacking Health 2026**, Columbia University BMES.
