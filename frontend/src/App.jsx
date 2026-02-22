@@ -14,6 +14,7 @@ import SurveillanceMap from './components/map/SurveillanceMap'
 import AgentFeed from './components/feed/AgentFeed'
 import AlertPanel from './components/alerts/AlertPanel'
 import IntakePanel from './components/intake/IntakePanel'
+import AgentOrchestration from './components/AgentOrchestration'
 
 const API = 'http://localhost:8111'
 const WS_URL = 'ws://localhost:8111/ws/feed'
@@ -216,6 +217,7 @@ export default function App() {
   )
 
   const [demoLoading, setDemoLoading] = useState(false)
+  const [showOrchestration, setShowOrchestration] = useState(false)
 
   const handleRunDemo = useCallback(async () => {
     setDemoLoading(true)
@@ -238,6 +240,19 @@ export default function App() {
       setTimeout(() => setDemoLoading(false), 2000)
     }
   }, [fetchData])
+
+  if (showOrchestration) {
+    return (
+      <div className="h-screen w-screen bg-slate-950">
+        <AgentOrchestration
+          events={events}
+          onRunDemo={handleRunDemo}
+          demoLoading={demoLoading}
+          onBack={() => setShowOrchestration(false)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950">
@@ -262,6 +277,14 @@ export default function App() {
           >
             <Play className="w-3.5 h-3.5" />
             {demoLoading ? 'RUNNING...' : 'RUN FULL DEMO'}
+          </button>
+          <button
+            onClick={() => setShowOrchestration(true)}
+            className="agent-view-btn flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded
+                       bg-purple-600/20 text-purple-400 border border-purple-600/30
+                       hover:bg-purple-600/30 cursor-pointer transition-colors"
+          >
+            🧠 Agent View
           </button>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
