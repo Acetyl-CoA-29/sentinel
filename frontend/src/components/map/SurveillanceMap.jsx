@@ -64,7 +64,7 @@ function SmoothZoomControl() {
   }
 
   return (
-    <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ position: 'absolute', top: 68, right: 12, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
       <button onClick={zoomIn} style={btnStyle} aria-label="Zoom in">+</button>
       <button onClick={zoomOut} style={btnStyle} aria-label="Zoom out">&minus;</button>
     </div>
@@ -177,7 +177,7 @@ export default function SurveillanceMap({ encounters, clusters }) {
 
       {/* Map Legend — frosted glass pill */}
       <div
-        className="absolute top-4 left-4 z-[1000] frosted-glass space-y-2"
+        className="absolute top-16 left-4 z-[1000] frosted-glass space-y-2"
         style={{
           backgroundColor: theme.glass.background,
           borderRadius: theme.radius.lg,

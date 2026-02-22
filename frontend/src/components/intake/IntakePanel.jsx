@@ -93,7 +93,7 @@ export default function IntakePanel({ onSubmit, language = 'en' }) {
   const displayText = listening && interim ? interim : text
 
   return (
-    <div className="absolute bottom-5 left-5 right-5 z-[1000]">
+    <div className="w-full">
       <form
         onSubmit={handleSubmit}
         aria-label="Submit a health report"

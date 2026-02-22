@@ -3,14 +3,13 @@ import {
   Shield,
   Activity,
   AlertTriangle,
-  Globe,
-  Radio,
-  Clock,
-  Users,
-  Zap,
   Play,
   Languages,
   Accessibility,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  Bell,
 } from 'lucide-react'
 import SurveillanceMap from './components/map/SurveillanceMap'
 import AgentFeed from './components/feed/AgentFeed'
@@ -36,93 +35,6 @@ function getThreatLevel(clusters) {
   return { label: 'LOW', style: theme.severity.low }
 }
 
-function MetricsBar({ encounters, clusters, events, language = 'en' }) {
-  const activeClusters = clusters.filter((c) => c.status === 'active')
-  const threat = getThreatLevel(clusters)
-  const lastEvent = events.length > 0 ? events[events.length - 1] : null
-  const lastTime = lastEvent?.timestamp
-    ? new Date(lastEvent.timestamp).toLocaleTimeString('en-US', { hour12: false })
-    : '--:--:--'
-
-  const [demoLoading, setDemoLoading] = useState(false)
-
-  const triggerAccessibilityDemo = async () => {
-    setDemoLoading(true)
-    try {
-      await fetch(`${API}/demo/accessibility`, { method: 'POST' })
-    } catch {}
-    setTimeout(() => setDemoLoading(false), 1000)
-  }
-
-  return (
-    <nav
-      aria-label={t(language, 'encounters') + ' metrics'}
-      className="flex items-center gap-6 px-6 py-2 shrink-0 frosted-glass"
-      style={{
-        backgroundColor: theme.glass.background,
-        fontSize: '14px',
-      }}
-    >
-      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
-        <Users className="w-3.5 h-3.5" aria-hidden="true" />
-        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'encounters')}:</span>
-        <span className="font-bold metric-value" style={{ color: theme.colors.text }}>{encounters.length}</span>
-      </div>
-
-      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
-        <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
-        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'activeClusters')}:</span>
-        <span className="font-bold" style={{ color: theme.colors.text }}>{activeClusters.length}</span>
-      </div>
-
-      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
-        <Radio className="w-3.5 h-3.5" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
-        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'agents')}:</span>
-        <span className="font-bold" style={{ color: theme.colors.accentGreen }}>5/5 ONLINE</span>
-      </div>
-
-      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
-        <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'threat')}:</span>
-        <span
-          className={`px-2 py-0.5 font-bold rounded ${threat.className || ''}`}
-          style={{
-            color: threat.style.text,
-            backgroundColor: threat.style.bg,
-            fontSize: '12px',
-          }}
-        >
-          {threat.label}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
-        <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'lastEvent')}:</span>
-        <span style={{ color: theme.colors.text, fontFamily: theme.font.mono.family, fontSize: '13px' }}>{lastTime}</span>
-      </div>
-
-      <div className="ml-auto flex items-center gap-2">
-        <button
-          onClick={triggerAccessibilityDemo}
-          disabled={demoLoading}
-          aria-label={t(language, 'accessibilityDemo')}
-          className="btn-pill flex items-center gap-1.5"
-          style={{
-            backgroundColor: alpha(theme.agents.accessibility.color, 0.15),
-            color: theme.agents.accessibility.color,
-            padding: '6px 14px',
-            fontSize: '13px',
-          }}
-        >
-          <Globe className="w-3.5 h-3.5" aria-hidden="true" />
-          {demoLoading ? t(language, 'running') : t(language, 'accessibilityDemo')}
-        </button>
-      </div>
-    </nav>
-  )
-}
-
 export default function App() {
   const [encounters, setEncounters] = useState([])
   const [clusters, setClusters] = useState([])
@@ -136,6 +48,7 @@ export default function App() {
   const language = settings.language
 
   const [showA11yPanel, setShowA11yPanel] = useState(false)
+  const [showDrawer, setShowDrawer] = useState(false)
 
   const addEvent = useCallback((event) => {
     const dedupKey = event.id || `${event.timestamp}-${event.agent}-${event.message}`
@@ -246,13 +159,13 @@ export default function App() {
   const [demoLoading, setDemoLoading] = useState(false)
   const [showOrchestration, setShowOrchestration] = useState(false)
   const [feedSplit, setFeedSplit] = useState(55)
-  const rightColRef = useRef(null)
+  const drawerRef = useRef(null)
 
   const handleDragStart = useCallback((e) => {
     e.preventDefault()
     const handleMove = (ev) => {
-      if (!rightColRef.current) return
-      const rect = rightColRef.current.getBoundingClientRect()
+      if (!drawerRef.current) return
+      const rect = drawerRef.current.getBoundingClientRect()
       const pct = Math.max(20, Math.min(80, ((ev.clientY - rect.top) / rect.height) * 100))
       setFeedSplit(pct)
     }
@@ -313,6 +226,10 @@ export default function App() {
     setShowOrchestration(false)
   }, [])
 
+  const threat = getThreatLevel(clusters)
+  const activeClusters = clusters.filter((c) => c.status === 'active')
+  const alertCount = activeClusters.length
+
   if (showOrchestration) {
     return (
       <div className="h-screen w-screen view-fade-enter" style={{ backgroundColor: theme.colors.bg }}>
@@ -325,19 +242,26 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col" style={{ backgroundColor: theme.colors.bg }}>
+    <div className="h-screen w-screen relative" style={{ backgroundColor: theme.colors.bg }}>
       {/* Skip to content */}
       <a href="#main-content" className="skip-to-content">
         Skip to main content
       </a>
 
-      {/* Header — 48px frosted glass */}
+      {/* Full-screen map — fills entire viewport */}
+      <div id="main-content" className="absolute inset-0 z-0">
+        <SurveillanceMap encounters={encounters} clusters={clusters} />
+      </div>
+
+      {/* Header overlay — fixed top, frosted glass */}
       <header
         role="banner"
-        className="flex items-center gap-4 px-6 shrink-0 frosted-glass stagger-1"
+        className="fixed top-0 left-0 right-0 z-[1001] flex items-center gap-4 px-6 frosted-glass stagger-1"
         style={{
           height: '48px',
-          backgroundColor: theme.glass.background,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
         }}
       >
         <Shield className="w-5 h-5" style={{ color: theme.colors.accentRed }} aria-hidden="true" />
@@ -365,8 +289,29 @@ export default function App() {
             {t(language, 'subtitle')}
           </p>
         </div>
+
+        {/* Threat level badge */}
+        <span
+          className={`px-2 py-0.5 font-bold rounded ${threat.className || ''}`}
+          style={{
+            color: threat.style.text,
+            backgroundColor: threat.style.bg,
+            fontSize: '12px',
+          }}
+        >
+          {threat.label}
+        </span>
+
         <div className="ml-auto flex items-center gap-3">
-          {/* Accessibility button — secondary pill */}
+          {/* Compact counts */}
+          <div className="flex items-center gap-2" style={{ color: theme.colors.textTertiary, fontSize: '14px' }} aria-live="polite">
+            <Activity className="w-4 h-4 animate-pulse" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
+            <span>{encounters.length} {t(language, 'encounters').toLowerCase()}</span>
+            <span style={{ color: theme.colors.textTertiary, opacity: 0.4 }} aria-hidden="true">|</span>
+            <span>{clusters.length} clusters</span>
+          </div>
+
+          {/* Accessibility button */}
           <button
             onClick={() => setShowA11yPanel(true)}
             aria-label={t(language, 'accessibilitySettings')}
@@ -406,7 +351,7 @@ export default function App() {
             </select>
           </div>
 
-          {/* Run Demo — primary pill */}
+          {/* Run Demo */}
           <button
             onClick={handleRunDemo}
             disabled={demoLoading}
@@ -424,7 +369,7 @@ export default function App() {
             {demoLoading ? t(language, 'running') : t(language, 'runDemo')}
           </button>
 
-          {/* Agent View — secondary pill */}
+          {/* Agent View */}
           <button
             onClick={() => setShowOrchestration(true)}
             aria-label="Agent orchestration view"
@@ -438,37 +383,100 @@ export default function App() {
           >
             Agent View
           </button>
-
-          <div className="flex items-center gap-2" style={{ color: theme.colors.textTertiary, fontSize: '14px' }} aria-live="polite">
-            <Activity className="w-4 h-4 animate-pulse" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
-            <span>{encounters.length} {t(language, 'encounters').toLowerCase()}</span>
-            <span style={{ color: theme.colors.textTertiary, opacity: 0.4 }} aria-hidden="true">|</span>
-            <span>{clusters.length} clusters</span>
-          </div>
         </div>
       </header>
 
-      {/* Metrics Bar */}
-      <div className="stagger-2">
-        <MetricsBar encounters={encounters} clusters={clusters} events={events} language={language} />
+      {/* Floating intake bar — bottom center */}
+      <div
+        className="fixed bottom-5 left-0 right-0 z-[1001] flex justify-center px-5"
+        style={{ pointerEvents: 'none' }}
+      >
+        <div style={{ pointerEvents: 'auto', width: '100%', maxWidth: 700 }}>
+          <IntakePanel onSubmit={handleIntakeSubmit} language={language} />
+        </div>
       </div>
 
-      {/* Main content */}
-      <main id="main-content" className="flex flex-1 min-h-0">
-        {/* Left: Map (60%) — full bleed */}
-        <section
-          aria-label="Disease surveillance map showing encounter locations in Dhaka"
-          className="w-[60%] relative panel-section stagger-3"
-        >
-          <SurveillanceMap encounters={encounters} clusters={clusters} />
-          <IntakePanel onSubmit={handleIntakeSubmit} language={language} />
-        </section>
+      {/* Click-outside backdrop (when drawer open) */}
+      {showDrawer && (
+        <div
+          className="fixed inset-0 z-[1000]"
+          onClick={() => setShowDrawer(false)}
+          aria-hidden="true"
+        />
+      )}
 
-        {/* Right: Feed + Alerts (40%) — resizable */}
-        <aside
-          ref={rightColRef}
-          aria-label="Agent activity and alerts"
-          className="w-[40%] flex flex-col"
+      {/* Slide-out drawer: pull tab + content */}
+      <aside
+        className="fixed top-0 right-0 bottom-0 z-[1001] flex drawer-slide"
+        style={{
+          transform: showDrawer ? 'translateX(0)' : 'translateX(380px)',
+        }}
+        aria-label="Agent activity and alerts drawer"
+      >
+        {/* Pull tab — always visible on right edge */}
+        <button
+          onClick={() => setShowDrawer((prev) => !prev)}
+          aria-label={showDrawer ? 'Close activity drawer' : 'Open activity drawer'}
+          aria-expanded={showDrawer}
+          className="self-center shrink-0 flex flex-col items-center justify-center gap-2 frosted-glass"
+          style={{
+            width: 40,
+            padding: '16px 0',
+            borderRadius: '12px 0 0 12px',
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: 'none',
+            cursor: 'pointer',
+            color: theme.colors.textSecondary,
+          }}
+        >
+          {showDrawer ? (
+            <ChevronRight className="w-4 h-4" style={{ color: theme.colors.text }} />
+          ) : (
+            <ChevronLeft className="w-4 h-4" style={{ color: theme.colors.text }} />
+          )}
+          <Activity className="w-4 h-4" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
+          <span
+            style={{
+              writingMode: 'vertical-rl',
+              textOrientation: 'mixed',
+              fontSize: '11px',
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              color: theme.colors.textSecondary,
+            }}
+          >
+            ACTIVITY
+          </span>
+          {/* Alert count badge */}
+          {alertCount > 0 && (
+            <span
+              className="flex items-center justify-center"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                backgroundColor: theme.colors.accentRed,
+                color: '#fff',
+                fontSize: '11px',
+                fontWeight: 700,
+              }}
+            >
+              {alertCount}
+            </span>
+          )}
+        </button>
+
+        {/* Drawer content — 380px */}
+        <div
+          ref={drawerRef}
+          className="w-[380px] h-full flex flex-col frosted-glass"
+          style={{
+            background: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+          }}
         >
           {/* Top: Agent Feed */}
           <section
@@ -476,10 +484,11 @@ export default function App() {
             tabIndex={-1}
             aria-label={t(language, 'agentActivity')}
             style={{ height: `${feedSplit}%` }}
-            className="min-h-0 panel-section stagger-4"
+            className="min-h-0 panel-section"
           >
             <AgentFeed events={events} language={language} />
           </section>
+
           {/* Drag handle */}
           <div
             onMouseDown={handleDragStart}
@@ -489,7 +498,7 @@ export default function App() {
             tabIndex={0}
             className="h-2 cursor-row-resize shrink-0 flex items-center justify-center"
             style={{
-              backgroundColor: theme.colors.bg,
+              backgroundColor: 'rgba(0,0,0,0.5)',
             }}
           >
             <div
@@ -497,16 +506,17 @@ export default function App() {
               style={{ backgroundColor: theme.colors.surfaceActive }}
             />
           </div>
+
           {/* Bottom: Alerts */}
           <section
             aria-label={t(language, 'activeAlerts')}
             style={{ height: `${100 - feedSplit}%` }}
-            className="min-h-0 panel-section stagger-5"
+            className="min-h-0 panel-section"
           >
             <AlertPanel clusters={clusters} language={language} />
           </section>
-        </aside>
-      </main>
+        </div>
+      </aside>
 
       {/* Accessibility Panel */}
       <AccessibilityPanel isOpen={showA11yPanel} onClose={() => setShowA11yPanel(false)} />

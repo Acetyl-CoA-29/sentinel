@@ -295,6 +295,11 @@ body {
 .stagger-4 { animation: fadeUp 0.5s ease-out both; animation-delay: 150ms; }
 .stagger-5 { animation: fadeUp 0.5s ease-out both; animation-delay: 200ms; }
 
+/* Drawer slide transition */
+.drawer-slide {
+  transition: transform 300ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
 /* View cross-fade transitions */
 .view-fade-enter {
   animation: viewFadeIn 200ms ease-out both;
