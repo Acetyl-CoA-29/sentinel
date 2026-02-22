@@ -4,39 +4,38 @@
 Autonomous community health surveillance system that turns any health worker with a phone into a full epidemiological surveillance team. 5 AI agents autonomously collect, analyze, investigate, and respond to emerging disease outbreaks in low-resource communities. Built for the Patient Safety track at Hacking Health 2026 (Columbia BMES). Zero literacy, zero smartphone, zero cost to patient.
 
 ## Tech Stack
-- **Frontend**: React 18 + Tailwind CSS + Vite, Leaflet maps, lucide-react icons
-- **Backend**: Python 3.11 + FastAPI, SQLite
-- **LLM**: Claude API with tool use (function calling), one system prompt per agent
+- **Frontend**: React 19 + Vite 7 + Tailwind CSS 4, Leaflet maps, lucide-react icons, recharts
+- **Backend**: Python 3.14 + FastAPI, SQLite (WAL mode, 15s timeout)
+- **LLM**: Claude API (anthropic SDK), model: claude-sonnet-4-20250514, one system prompt per agent
 - **Voice**: Web Speech API (browser-native speech-to-text for demo)
-- **Spatial**: DBSCAN clustering, GeoJSON for cluster boundaries
+- **Spatial**: scikit-learn DBSCAN clustering with spatiotemporal distance metric
+- **Ports**: Backend on **8111**, Frontend on **5175** (may auto-increment if in use)
 
 ## File Structure
 ```
 backend/
-  main.py                    — FastAPI app, CORS, lifespan, WebSocket
-  db.py                      — SQLite connection, schema creation
+  main.py                    — FastAPI app, CORS (allow_origins=["*"]), WebSocket, agent pipeline
+  db.py                      — SQLite connection (WAL mode, 15s timeout), schema creation
   seed.py                    — 80 synthetic encounters (Dhaka cholera outbreak pattern)
   clustering.py              — DBSCAN spatiotemporal clustering + anomaly scoring
   agents/
     intake.py                — NL text → structured encounter extraction (Claude)
-    analyst.py               — Cluster detection + disease signature matching
-    research.py              — Investigation agent (PubMed, disease DB, outbreak feeds)
-    response.py              — SitRep generation, CHW alerts, community messaging
-    accessibility.py         — Monitors interactions, adapts modality/pacing/language
-    orchestrator.py          — Agent-to-agent handoffs, message passing, activity feed
+    research.py              — Epidemiological investigation agent (Claude)
+    response.py              — SitRep generation, CHW alerts
+    orchestrator.py          — Event logging + WebSocket broadcasting (ws_connections list)
   data/
-    disease_signatures.json  — Symptom → disease probability mappings
-    baseline_rates.json      — Endemic disease baseline rates by region
+    disease_signatures.json  — 6 disease symptom profiles
+    baseline_rates.json      — Dhaka endemic baseline rates
 
 frontend/src/
-  App.jsx                    — Main dashboard layout
+  App.jsx                    — Main layout, WebSocket, state management, language selector
+  i18n.js                    — Translations (en, bn, hi, es) + language/speech config
   components/
-    map/SurveillanceMap.jsx  — Leaflet map with encounter pins + cluster overlays
-    feed/AgentFeed.jsx       — Real-time agent activity log (terminal style)
-    alerts/AlertPanel.jsx    — Active cluster alert cards
+    map/SurveillanceMap.jsx  — Leaflet map with encounter pins + cluster overlays + legend
+    feed/AgentFeed.jsx       — Real-time agent activity log with color-coded cards
+    alerts/AlertPanel.jsx    — Active cluster alerts + recharts epidemic curve + SitRep modal
     intake/IntakePanel.jsx   — Text + voice input for CHW encounter reports
-    clusters/ClusterDetail.jsx — Expanded cluster view with disease probabilities
-    sitrep/SitRepViewer.jsx  — Generated situation reports
+    AgentOrchestration.jsx   — Full-screen SVG pipeline visualization (pentagon layout)
 ```
 
 ## Data Model
@@ -65,77 +64,81 @@ severity TEXT (info/warning/alert/critical), cluster_id INT NULL
 ## API Endpoints
 
 ### Core
-- `POST /encounters` — create encounter directly (structured data)
-- `GET /encounters` — list all encounters, optional `?since=` filter
-- `POST /intake` — raw natural language text in, structured encounter out (Intake Agent)
+- `POST /intake` — raw natural language text in, structured encounter out (Intake Agent); triggers full agent pipeline as background task
+- `GET /encounters` — list all encounters
 - `GET /clusters` — list detected clusters with disease probabilities
-- `GET /clusters/{id}` — cluster detail with linked encounters
-- `WebSocket /ws/feed` — streams agent activity events as JSON
+- `GET /events?limit=N` — fetch recent agent events (for backfill on page load)
+- `WebSocket /ws/feed` — streams agent activity events as JSON in real-time
 
 ### Agent Triggers
-- `POST /analyze` — manually trigger Analyst Agent (auto-runs on new encounters too)
-- `GET /sitrep/{cluster_id}` — generate situation report for a cluster
+- `POST /analyze` — manually trigger DBSCAN analysis
+- `GET /sitrep/{cluster_id}` — generate WHO-style situation report for a cluster
+- `POST /demo/accessibility` — trigger accessibility agent demo (language/modality adaptation)
 
 ## Architecture Decisions
 
-### Multi-agent system (not a chatbot)
-Each agent is a separate Claude API call with its own system prompt and toolset. The orchestrator manages handoffs. Agents run autonomously — no human clicking "analyze" buttons. New encounter → Intake extracts → Analyst clusters → Research investigates → Response generates alerts.
+### Multi-agent pipeline (not a chatbot)
+Each agent is a separate Claude API call with its own system prompt. Agents run autonomously in a timed pipeline — new encounter → Intake extracts → Analyst clusters → Research investigates → Response generates alerts → Accessibility adapts delivery. Pipeline events broadcast via WebSocket with delays to show agent "thinking" in real-time.
+
+### Blocking calls handled with asyncio.to_thread
+Claude API calls are synchronous (anthropic SDK). All calls to `extract_encounter()` and `investigate_cluster()` are wrapped in `asyncio.to_thread()` to prevent blocking the FastAPI event loop. This was critical to fix SQLite "database is locked" errors.
 
 ### Agent activity feed
-Every agent action logs to agent_events and broadcasts via WebSocket. The frontend shows agent "thinking" in real-time. This is a core demo feature — judges should see the reasoning chains.
+Every agent action logs to agent_events and broadcasts via WebSocket. The frontend deduplicates events using a `seenEventIds` ref set. Events auto-scroll in the feed. This is a core demo feature — judges should see the reasoning chains.
 
 ### Seed data tells a story
-The 80 seeded encounters simulate a cholera outbreak in Dhaka over 5 days. Starts with scattered GI cases, builds into a clear cluster. Noise encounters (malaria, respiratory, injuries) are spread across other areas. The demo walks through this timeline.
+The 80 seeded encounters simulate a cholera outbreak in Dhaka over 5 days. Starts with scattered GI cases, builds into a clear cluster. Noise encounters (malaria, respiratory, injuries) are spread across other areas. Database seeds automatically on first startup.
 
 ### Clustering approach
 DBSCAN on (lat, lng, days_since_epoch) with eps tuned for ~2km spatial and ~3 day temporal window. After clustering, check dominant symptom profile against disease_signatures.json. Anomaly score = (observed_rate - baseline_rate) / baseline_rate.
 
-### Accessibility Orchestrator
-Monitors interaction patterns from Intake Agent sessions. Detects confusion signals (repeated questions, long pauses, language switching). Dynamically adjusts: slower pacing, simpler questions, switch modality. This is the key patentable differentiator — feature prominently in demo.
+### Multi-language i18n
+Language selector in header (English, Bengali, Hindi, Spanish). Translations stored in `frontend/src/i18n.js`. The `t(lang, key)` helper function provides fallback to English. Speech recognition language also switches (en-US, bn-BD, hi-IN, es-ES). Key UI labels all translated — intake placeholder, metrics bar, feed/alert headers, buttons.
+
+### Agent Orchestration view
+Full-screen SVG visualization (viewBox 700x500) showing pentagon layout of 5 agent nodes. Nodes glow/pulse when active (4-second highlight window based on incoming WebSocket events). Animated connection lines show data flow. Toggle via "Agent View" button in header.
+
+### Resizable panels
+Agent feed and alert panel in the right column are separated by a drag handle. Default 55/45 split, adjustable from 20% to 80% via mousedown/mousemove/mouseup handlers.
+
+### Interactive epidemic curve
+Recharts BarChart with stacked bars by symptom type (GI=red, Respiratory=blue, Other=gray). Tooltips on hover. Baseline reference line at 2.3 cases/day. CartesianGrid for readability.
 
 ### Voice input (demo)
-Browser Web Speech API for speech-to-text. No Twilio — keep it simple for 48 hours. The text box and mic button simulate a CHW calling in or texting.
+Browser Web Speech API for speech-to-text. No Twilio — keep it simple. Language switches with the i18n selector. Auto-submits when speech recognition finalizes.
 
 ### WebSocket for real-time feel
-Dashboard connects to /ws/feed on load. All agent events stream live. When new encounters come in, map updates, feed scrolls, clusters form. No manual refresh.
+Dashboard connects to /ws/feed on load with auto-reconnect (2s delay). All agent events stream live. Map auto-refreshes when analyst events arrive.
 
 ## Design Conventions
-- Theme: dark, surveillance/medical aesthetic
-- Agent colors: Intake=blue-400, Analyst=orange-400, Research=purple-400, Response=green-400, Accessibility=teal-400
+- Theme: dark, surveillance/medical aesthetic (slate-950/900 backgrounds)
+- Agent colors: Intake=#60a5fa (blue), Analyst=#fb923c (orange), Research=#a78bfa (purple), Response=#4ade80 (green), Accessibility=#2dd4bf (teal)
 - Severity colors: critical=red-500, alert=orange-500, warning=amber-500, info=slate-400
-- Agent feed: monospace font, terminal-style scrolling log
-- Map: dark tile layer, red markers for GI symptoms, blue for respiratory, gray for other, translucent red circles for clusters
-- Cards: dark bg (slate-800/900), border-slate-700, rounded-lg
+- Agent feed: color-coded cards with icon, label, severity badge, timestamp
+- Map: CARTO dark tiles, red pulsing markers for clusters, blue/gray for individual encounters, translucent circles for cluster radius
+- Cards: dark bg (slate-900), border-slate-700/50, rounded-lg
+- Animations: fadeSlideIn for cards, criticalGlow for alerts, pulseRing for map clusters, agentViewGlow for Agent View button
 
-## Build Priorities (48-hour hackathon)
-
-### Must-Have (MVP)
-1. Working Intake Agent (NL text → structured encounter)
-2. Working Analyst Agent (DBSCAN clustering + disease matching)
-3. Dashboard with map showing encounters and clusters
-4. Agent activity feed with real-time reasoning
-5. Pre-seeded demo dataset (cholera outbreak story)
-6. One complete end-to-end flow for demo
-
-### Should-Have
-7. Research Agent (investigation reports)
-8. Response Agent (SitReps + CHW alerts)
-9. Accessibility Orchestrator demo
-10. Voice input widget
-11. Multi-language support
-
-### Stretch
-12. Animated cluster visualization
-13. Historical timeline playback
-14. Multiple simultaneous outbreaks
+## Build Status
+All MVP and Should-Have items completed:
+1. Working Intake Agent (NL text → structured encounter) ✓
+2. Working Analyst Agent (DBSCAN clustering + disease matching) ✓
+3. Dashboard with map showing encounters and clusters ✓
+4. Agent activity feed with real-time reasoning ✓
+5. Pre-seeded demo dataset (cholera outbreak story) ✓
+6. End-to-end flow (intake → cluster → research → response → accessibility) ✓
+7. Research Agent (real Claude-powered investigation) ✓
+8. Response Agent (SitReps + CHW alerts) ✓
+9. Accessibility Orchestrator demo ✓
+10. Voice input widget ✓
+11. Multi-language support (en/bn/hi/es) ✓
+12. Agent Orchestration visualization ✓
+13. Interactive recharts epidemic curve ✓
+14. Resizable panels ✓
+15. Full Demo button (CHW Fatima scenario) ✓
 
 ## Demo Script
-See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). The demo should show:
-1. Map with pre-seeded data, clusters already visible
-2. Live intake: type/speak a new encounter, watch it appear on map
-3. Agent feed shows Intake processing, Analyst detecting, reasoning visible
-4. Cluster alert appears with disease probability
-5. (If built) SitRep generated, CHW alert drafted
+See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Judging Alignment
 - **Technical Design + Functionality (45%)**: Multi-agent architecture, autonomous operation, real-time dashboard
@@ -150,18 +153,23 @@ See [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md). The demo should show:
 ```bash
 # Backend
 cd backend
-python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+python -m venv .venv
+# Linux/Mac: source .venv/bin/activate
+# Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env  # Add ANTHROPIC_API_KEY
-python seed.py  # Load demo data
-uvicorn main:app --reload --port 8111
+cp ../.env.example .env  # Add ANTHROPIC_API_KEY
+uvicorn main:app --port 8111
+# Database seeds automatically on first startup
 
 # Frontend
 cd frontend
-npm install && npm run dev  # http://localhost:5175
+npm install
+npm run dev  # http://localhost:5175
 ```
 
-Required env vars: `ANTHROPIC_API_KEY`
+Required env vars: `ANTHROPIC_API_KEY` (in `backend/.env`)
+
+**Windows note**: The backend venv is at `backend/.venv`. Due to OneDrive cloud sync, launch via PowerShell using `.venv\Scripts\uvicorn.exe` or `.venv\Scripts\python.exe -m uvicorn main:app --port 8111`.
 
 ## Workflow Rules
 - Plan mode for any non-trivial task (3+ steps)

@@ -182,7 +182,8 @@ def detect_and_store() -> list[dict]:
 
     conn = get_conn()
 
-    # Clear old active clusters and re-detect
+    # Clear old active clusters — nullify FK references first to avoid constraint violation
+    conn.execute("UPDATE agent_events SET cluster_id = NULL WHERE cluster_id IN (SELECT id FROM clusters WHERE status = 'active')")
     conn.execute("DELETE FROM clusters WHERE status = 'active'")
 
     stored = []
