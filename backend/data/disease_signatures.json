@@ -1,0 +1,72 @@
+{
+  "cholera": {
+    "key_symptoms": ["watery diarrhea", "vomiting", "dehydration", "leg cramps", "nausea"],
+    "probability_weights": {
+      "watery diarrhea": 0.35,
+      "vomiting": 0.20,
+      "dehydration": 0.20,
+      "leg cramps": 0.10,
+      "nausea": 0.10,
+      "fever": 0.05
+    },
+    "min_cluster_size": 5,
+    "incubation_days": [1, 5],
+    "severity_profile": "rapid_onset_high"
+  },
+  "dengue": {
+    "key_symptoms": ["high fever", "headache", "joint pain", "rash", "eye pain"],
+    "probability_weights": {
+      "high fever": 0.25,
+      "headache": 0.20,
+      "joint pain": 0.20,
+      "rash": 0.15,
+      "eye pain": 0.10,
+      "fatigue": 0.10
+    },
+    "min_cluster_size": 3,
+    "incubation_days": [3, 14],
+    "severity_profile": "moderate_sustained"
+  },
+  "malaria": {
+    "key_symptoms": ["cyclic fever", "chills", "sweating", "headache", "fatigue"],
+    "probability_weights": {
+      "cyclic fever": 0.30,
+      "chills": 0.20,
+      "sweating": 0.15,
+      "headache": 0.15,
+      "fatigue": 0.10,
+      "nausea": 0.10
+    },
+    "min_cluster_size": 4,
+    "incubation_days": [7, 30],
+    "severity_profile": "cyclic_moderate"
+  },
+  "typhoid": {
+    "key_symptoms": ["sustained fever", "abdominal pain", "headache", "weakness", "constipation"],
+    "probability_weights": {
+      "sustained fever": 0.30,
+      "abdominal pain": 0.25,
+      "headache": 0.15,
+      "weakness": 0.15,
+      "constipation": 0.10,
+      "diarrhea": 0.05
+    },
+    "min_cluster_size": 3,
+    "incubation_days": [6, 30],
+    "severity_profile": "slow_onset_high"
+  },
+  "respiratory_infection": {
+    "key_symptoms": ["cough", "fever", "sore throat", "runny nose", "shortness of breath"],
+    "probability_weights": {
+      "cough": 0.25,
+      "fever": 0.20,
+      "sore throat": 0.20,
+      "runny nose": 0.15,
+      "shortness of breath": 0.15,
+      "body aches": 0.05
+    },
+    "min_cluster_size": 8,
+    "incubation_days": [1, 7],
+    "severity_profile": "variable"
+  }
+}

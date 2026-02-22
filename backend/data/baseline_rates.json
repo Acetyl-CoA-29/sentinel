@@ -1,0 +1,16 @@
+{
+  "dhaka": {
+    "cholera": 0.02,
+    "dengue": 0.03,
+    "malaria": 0.01,
+    "typhoid": 0.015,
+    "respiratory_infection": 0.08
+  },
+  "default": {
+    "cholera": 0.01,
+    "dengue": 0.02,
+    "malaria": 0.015,
+    "typhoid": 0.01,
+    "respiratory_infection": 0.05
+  }
+}

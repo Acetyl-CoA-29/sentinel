@@ -1,0 +1,165 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #0f172a;
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Leaflet dark theme overrides */
+.leaflet-container {
+  background: #0f172a;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+}
+
+.leaflet-popup-tip {
+  background: #1e293b;
+}
+
+.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* === Agent Feed Card Animations === */
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.event-card {
+  animation: fadeSlideIn 0.35s ease-out both;
+}
+
+/* Critical/alert event glow */
+@keyframes criticalGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.2), inset 0 0 4px rgba(239, 68, 68, 0.05); }
+  50% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.1); }
+}
+
+.event-critical {
+  animation: criticalGlow 2s ease-in-out infinite, fadeSlideIn 0.35s ease-out both;
+}
+
+.event-warning {
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.15), inset 0 0 4px rgba(245, 158, 11, 0.05);
+}
+
+/* === Map Cluster Pulse === */
+.cluster-pulse-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #ef4444;
+  animation: pulseRing 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.pulse-ring-2 {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid #ef4444;
+  animation: pulseRing 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation-delay: 1.25s;
+}
+
+.pulse-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+}
+
+.pulse-dot-orange {
+  background: #f97316;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+}
+
+.pulse-ring-orange {
+  border-color: #f97316;
+}
+
+@keyframes pulseRing {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* === Metrics Bar === */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.metric-value {
+  animation: countUp 0.4s ease-out;
+}
+
+/* Threat level flash */
+@keyframes threatFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.threat-critical {
+  animation: threatFlash 1.5s ease-in-out infinite;
+}
+
+/* === Accessibility demo shimmer === */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.demo-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
