@@ -6,65 +6,20 @@ import {
   Search,
   FileText,
   Globe,
+  Volume2,
 } from 'lucide-react'
 import { t } from '../../i18n'
+import { useAccessibility } from '../../contexts/AccessibilityContext'
+import { useTTS } from '../accessibility/TextToSpeech'
+import { simplifyAgentName, simplifyEventMessage } from '../accessibility/SimpleViewTransforms'
+import { theme, alpha } from '../../design'
 
-const AGENT_CONFIG = {
-  intake: {
-    icon: ClipboardList,
-    label: 'INTAKE',
-    borderColor: 'border-l-blue-500',
-    bgColor: 'bg-blue-500/10',
-    textColor: 'text-blue-400',
-    dotColor: 'bg-blue-400',
-  },
-  analyst: {
-    icon: BarChart3,
-    label: 'ANALYST',
-    borderColor: 'border-l-orange-500',
-    bgColor: 'bg-orange-500/10',
-    textColor: 'text-orange-400',
-    dotColor: 'bg-orange-400',
-  },
-  research: {
-    icon: Search,
-    label: 'RESEARCH',
-    borderColor: 'border-l-purple-500',
-    bgColor: 'bg-purple-500/10',
-    textColor: 'text-purple-400',
-    dotColor: 'bg-purple-400',
-  },
-  response: {
-    icon: FileText,
-    label: 'RESPONSE',
-    borderColor: 'border-l-green-500',
-    bgColor: 'bg-green-500/10',
-    textColor: 'text-green-400',
-    dotColor: 'bg-green-400',
-  },
-  accessibility: {
-    icon: Globe,
-    label: 'ACCESS',
-    borderColor: 'border-l-teal-500',
-    bgColor: 'bg-teal-500/10',
-    textColor: 'text-teal-400',
-    dotColor: 'bg-teal-400',
-  },
-}
-
-const SEVERITY_BADGE = {
-  warning: {
-    label: 'WARNING',
-    cls: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  },
-  alert: {
-    label: 'ALERT',
-    cls: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  },
-  critical: {
-    label: 'CRITICAL',
-    cls: 'bg-red-500/20 text-red-400 border-red-500/30',
-  },
+const AGENT_ICONS = {
+  intake: ClipboardList,
+  analyst: BarChart3,
+  research: Search,
+  response: FileText,
+  accessibility: Globe,
 }
 
 function formatTime(ts) {
@@ -77,42 +32,91 @@ function formatTime(ts) {
   }
 }
 
-function EventCard({ event }) {
-  const agent = AGENT_CONFIG[event.agent] || AGENT_CONFIG.intake
-  const badge = SEVERITY_BADGE[event.severity]
-  const Icon = agent.icon
+function EventCard({ event, simpleView }) {
+  const agentDef = theme.agents[event.agent] || theme.agents.intake
+  const agentColor = agentDef.color
+  const Icon = AGENT_ICONS[event.agent] || ClipboardList
+  const severity = theme.severity[event.severity]
   const isHigh = event.severity === 'alert' || event.severity === 'critical'
   const isWarn = event.severity === 'warning'
 
+  const displayLabel = simpleView ? simplifyAgentName(event.agent) : agentDef.label
+  const displayMessage = simpleView ? simplifyEventMessage(event.message) : event.message
+
   return (
     <div
+      role={isHigh ? 'alert' : undefined}
+      aria-label={`${displayLabel}: ${displayMessage}`}
       className={`
-        event-card border-l-2 ${agent.borderColor} rounded-r-lg px-3 py-2
-        bg-slate-900/50 hover:bg-slate-800/60 transition-colors duration-150
+        event-card card-lift
         ${isHigh ? 'event-critical' : ''}
         ${isWarn ? 'event-warning' : ''}
       `}
+      style={{
+        borderLeft: `3px solid ${agentColor}`,
+        borderRadius: theme.radius.md,
+        padding: '16px',
+        backgroundColor: alpha(theme.colors.surface, 0.5),
+      }}
     >
-      <div className="flex items-center gap-2 mb-0.5">
-        <div className={`p-1 rounded ${agent.bgColor}`}>
-          <Icon className={`w-3 h-3 ${agent.textColor}`} />
+      <div className="flex items-center gap-3 mb-2">
+        {/* 24x24 agent icon circle */}
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            backgroundColor: alpha(agentColor, 0.15),
+          }}
+        >
+          <Icon className="w-3 h-3" style={{ color: agentColor }} aria-hidden="true" />
         </div>
-        <span className={`text-[10px] font-bold tracking-wider ${agent.textColor}`}>
-          {agent.label}
+        <span
+          style={{
+            color: agentColor,
+            fontSize: '14px',
+            fontWeight: 600,
+          }}
+        >
+          {displayLabel}
         </span>
-        {badge && (
+        {severity && (
           <span
-            className={`px-1.5 text-[9px] font-bold uppercase rounded border ${badge.cls}`}
+            style={{
+              backgroundColor: severity.bg,
+              color: severity.text,
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '980px',
+              textTransform: 'uppercase',
+            }}
           >
-            {badge.label}
+            {event.severity.toUpperCase()}
           </span>
         )}
-        <span className="ml-auto text-[10px] text-slate-600 font-mono tabular-nums">
+        <span
+          className="ml-auto"
+          style={{
+            color: theme.colors.textTertiary,
+            fontSize: '12px',
+            fontFamily: theme.font.mono.family,
+          }}
+        >
           {formatTime(event.timestamp)}
         </span>
       </div>
-      <p className="text-[12px] text-slate-300 leading-relaxed pl-7">
-        {event.message}
+      <p
+        style={{
+          color: theme.colors.text,
+          fontSize: '15px',
+          fontWeight: 400,
+          lineHeight: 1.47,
+          paddingLeft: '36px',
+        }}
+      >
+        {displayMessage}
       </p>
     </div>
   )
@@ -120,46 +124,91 @@ function EventCard({ event }) {
 
 export default function AgentFeed({ events, language = 'en' }) {
   const scrollRef = useRef(null)
+  const { settings } = useAccessibility()
+  const { speak, enabled: ttsEnabled } = useTTS()
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
     }
   }, [events])
 
+  const handleReadAll = () => {
+    const last5 = events.slice(-5)
+    const text = last5
+      .map((e) => `${e.agent}: ${e.message}`)
+      .join('. ')
+    speak(text)
+  }
+
   return (
-    <div className="h-full flex flex-col bg-slate-950">
+    <div className="h-full flex flex-col" style={{ backgroundColor: theme.colors.bg }}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/80 border-b border-slate-700/50 shrink-0">
-        <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+      <div
+        className="flex items-center gap-2 px-4 py-3 shrink-0"
+        style={{
+          backgroundColor: alpha(theme.colors.surface, 0.8),
+        }}
+      >
+        <Activity className="w-3.5 h-3.5 animate-pulse" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
+        <span
+          style={{
+            color: theme.colors.textSecondary,
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
           {t(language, 'agentActivity')}
         </span>
         <div className="ml-auto flex items-center gap-1.5">
-          {Object.entries(AGENT_CONFIG).map(([key, cfg]) => (
+          {ttsEnabled && (
+            <button
+              onClick={handleReadAll}
+              aria-label="Read recent events aloud"
+              className="p-1 rounded btn-icon"
+              style={{ color: theme.colors.textTertiary }}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {Object.entries(theme.agents).map(([key, cfg]) => (
             <div
               key={key}
-              className={`w-1.5 h-1.5 rounded-full ${cfg.dotColor}`}
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: cfg.color }}
               title={cfg.label}
+              aria-hidden="true"
             />
           ))}
-          <span className="text-[10px] text-slate-600 ml-1">{events.length}</span>
+          <span style={{ color: theme.colors.textTertiary, fontSize: '12px', marginLeft: '4px' }}>{events.length}</span>
         </div>
       </div>
 
       {/* Feed */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-2 space-y-1.5"
+        role="log"
+        aria-live="polite"
+        aria-label="Agent event feed"
+        className="flex-1 overflow-y-auto p-3 space-y-2"
       >
         {events.length === 0 && (
-          <div className="text-slate-600 text-center text-xs mt-8 space-y-2">
-            <Activity className="w-6 h-6 mx-auto text-slate-700 animate-pulse" />
+          <div className="text-center mt-8 space-y-2" style={{ color: theme.colors.textTertiary, fontSize: '14px' }}>
+            <Activity className="w-6 h-6 mx-auto animate-pulse" style={{ color: theme.colors.surfaceActive }} aria-hidden="true" />
             <p>{t(language, 'waitingForActivity')}</p>
           </div>
         )}
         {events.map((event, i) => (
-          <EventCard key={event.id || i} event={event} />
+          <EventCard
+            key={event._uid || `${event.id}-${i}`}
+            event={event}
+            simpleView={settings.simpleView}
+          />
         ))}
       </div>
     </div>

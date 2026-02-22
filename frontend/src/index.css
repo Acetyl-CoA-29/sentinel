@@ -1,35 +1,59 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+/* === Theme CSS Custom Properties (mirrors design.js) === */
+:root {
+  --theme-bg: #000000;
+  --theme-surface: #1C1C1E;
+  --theme-surface-hover: #2C2C2E;
+  --theme-surface-active: #3A3A3C;
+  --theme-text: #F5F5F7;
+  --theme-text-secondary: #86868B;
+  --theme-text-tertiary: #6E6E73;
+  --theme-accent: #0A84FF;
+  --theme-accent-green: #30D158;
+  --theme-accent-red: #FF453A;
+  --theme-accent-orange: #FF9F0A;
+  --theme-border: rgba(255,255,255,0.08);
+  --theme-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+
+  /* Agent colors */
+  --theme-agent-intake: #0A84FF;
+  --theme-agent-analyst: #FF9F0A;
+  --theme-agent-research: #BF5AF2;
+  --theme-agent-response: #30D158;
+  --theme-agent-accessibility: #64D2FF;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: #0f172a;
-  color: #e2e8f0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+  font-family: var(--theme-font-family);
 }
 
 /* Leaflet dark theme overrides */
 .leaflet-container {
-  background: #0f172a;
+  background: var(--theme-bg);
 }
 
 .leaflet-popup-content-wrapper {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--theme-surface);
+  color: var(--theme-text);
+  border: 1px solid var(--theme-border);
   border-radius: 8px;
 }
 
 .leaflet-popup-tip {
-  background: #1e293b;
+  background: var(--theme-surface);
 }
 
 .leaflet-popup-close-button {
-  color: #94a3b8 !important;
+  color: var(--theme-text-secondary) !important;
 }
 
 /* Scrollbar styling */
@@ -37,14 +61,14 @@ html, body, #root {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--theme-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--theme-surface-active);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--theme-text-tertiary);
 }
 
 /* === Agent Feed Card Animations === */
@@ -65,8 +89,8 @@ html, body, #root {
 
 /* Critical/alert event glow */
 @keyframes criticalGlow {
-  0%, 100% { box-shadow: 0 0 4px rgba(239, 68, 68, 0.2), inset 0 0 4px rgba(239, 68, 68, 0.05); }
-  50% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(239, 68, 68, 0.1); }
+  0%, 100% { box-shadow: 0 0 4px rgba(255,69,58,0.2), inset 0 0 4px rgba(255,69,58,0.05); }
+  50% { box-shadow: 0 0 16px rgba(255,69,58,0.4), inset 0 0 8px rgba(255,69,58,0.1); }
 }
 
 .event-critical {
@@ -74,7 +98,7 @@ html, body, #root {
 }
 
 .event-warning {
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.15), inset 0 0 4px rgba(245, 158, 11, 0.05);
+  box-shadow: 0 0 8px rgba(255,159,10,0.15), inset 0 0 4px rgba(255,159,10,0.05);
 }
 
 /* === Map Cluster Pulse === */
@@ -87,7 +111,7 @@ html, body, #root {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid #ef4444;
+  border: 2px solid var(--theme-accent-red);
   animation: pulseRing 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
@@ -95,7 +119,7 @@ html, body, #root {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid #ef4444;
+  border: 2px solid var(--theme-accent-red);
   animation: pulseRing 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
   animation-delay: 1.25s;
 }
@@ -107,18 +131,18 @@ html, body, #root {
   width: 10px;
   height: 10px;
   margin: -5px 0 0 -5px;
-  background: #ef4444;
+  background: var(--theme-accent-red);
   border-radius: 50%;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+  box-shadow: 0 0 10px rgba(255,69,58,0.8);
 }
 
 .pulse-dot-orange {
-  background: #f97316;
-  box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);
+  background: var(--theme-accent-orange);
+  box-shadow: 0 0 10px rgba(255,159,10,0.8);
 }
 
 .pulse-ring-orange {
-  border-color: #f97316;
+  border-color: var(--theme-accent-orange);
 }
 
 @keyframes pulseRing {
@@ -159,17 +183,239 @@ html, body, #root {
 }
 
 .demo-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.1) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(100,210,255,0.1) 50%, transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
 
 /* === Agent View button glow === */
 @keyframes agentViewGlow {
-  0%, 100% { box-shadow: 0 0 4px rgba(168, 85, 247, 0.15); }
-  50% { box-shadow: 0 0 14px rgba(168, 85, 247, 0.35), 0 0 4px rgba(168, 85, 247, 0.2); }
+  0%, 100% { box-shadow: 0 0 4px rgba(191,90,242,0.15); }
+  50% { box-shadow: 0 0 14px rgba(191,90,242,0.35), 0 0 4px rgba(191,90,242,0.2); }
 }
 
 .agent-view-btn {
   animation: agentViewGlow 3s ease-in-out infinite;
+}
+
+/* === Phase 2: Breathing Room === */
+
+/* Panel hover lift — attach to any card */
+.card-lift {
+  transition: transform 300ms cubic-bezier(0.25, 0.1, 0.25, 1),
+              box-shadow 300ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+/* Frosted glass base */
+.frosted-glass {
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Global minimum line height */
+body {
+  line-height: 1.47;
+}
+
+/* === Phase 3: Component Refinements === */
+
+/* Apple-style pill button */
+.btn-pill {
+  border: none;
+  border-radius: 980px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 200ms ease, transform 150ms ease;
+}
+.btn-pill:active {
+  transform: scale(0.97);
+}
+.btn-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-pill:disabled:active {
+  transform: none;
+}
+
+/* Alert card hover background shift */
+.alert-card-hover {
+  transition: background-color 200ms ease,
+              transform 300ms cubic-bezier(0.25, 0.1, 0.25, 1),
+              box-shadow 300ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+.alert-card-hover:hover {
+  background-color: var(--theme-surface-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+
+/* Intake input focus glow (replaces default outline) */
+.intake-input:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(10,132,255,0.4), 0 0 20px rgba(10,132,255,0.1);
+}
+
+/* Event card refined slide-up (8px, 300ms) */
+@keyframes eventSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.event-card {
+  animation: eventSlideIn 0.3s ease-out both;
+}
+
+/* === Phase 4: Animations & Polish === */
+
+/* Page load stagger-fade from bottom */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagger-1 { animation: fadeUp 0.5s ease-out both; animation-delay: 0ms; }
+.stagger-2 { animation: fadeUp 0.5s ease-out both; animation-delay: 50ms; }
+.stagger-3 { animation: fadeUp 0.5s ease-out both; animation-delay: 100ms; }
+.stagger-4 { animation: fadeUp 0.5s ease-out both; animation-delay: 150ms; }
+.stagger-5 { animation: fadeUp 0.5s ease-out both; animation-delay: 200ms; }
+
+/* View cross-fade transitions */
+.view-fade-enter {
+  animation: viewFadeIn 200ms ease-out both;
+}
+
+@keyframes viewFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Hover states for all interactive elements */
+.hover-bg:hover {
+  background-color: var(--theme-surface-hover) !important;
+}
+
+.btn-pill:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+/* Close/icon button hover */
+.btn-icon {
+  transition: background-color 200ms ease, color 200ms ease;
+  cursor: pointer;
+}
+.btn-icon:hover {
+  background-color: var(--theme-surface-hover);
+  color: var(--theme-text);
+}
+
+/* Severity cross-fade (background + color transitions) */
+.severity-fade {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+/* ==========================================================
+   ACCESSIBILITY
+   ========================================================== */
+
+/* --- Font Scaling --- */
+html.font-normal  { font-size: 14px; }
+html.font-large   { font-size: 18px; }
+html.font-xlarge  { font-size: 22px; }
+
+/* --- Focus Indicators --- */
+*:focus-visible {
+  outline: 3px solid var(--theme-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* --- Skip-to-Content --- */
+.skip-to-content {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: var(--theme-accent);
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: top 0.2s;
+}
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* --- High Contrast Mode (overrides CSS custom properties) --- */
+html.high-contrast {
+  --theme-bg: #000000;
+  --theme-surface: #000000;
+  --theme-surface-hover: #1a1a1a;
+  --theme-surface-active: #333333;
+  --theme-text: #ffffff;
+  --theme-text-secondary: #ffffff;
+  --theme-text-tertiary: #ffffff;
+  --theme-border: #ffffff;
+}
+
+html.high-contrast .leaflet-container {
+  background: #000 !important;
+}
+
+html.high-contrast .leaflet-popup-content-wrapper {
+  background: #000 !important;
+  border-color: #fff !important;
+}
+
+html.high-contrast .leaflet-popup-tip {
+  background: #000 !important;
+}
+
+html.high-contrast ::-webkit-scrollbar-track {
+  background: #000;
+}
+
+html.high-contrast ::-webkit-scrollbar-thumb {
+  background: #666;
+}
+
+/* --- Color Blind Filters --- */
+html[data-color-blind="protanopia"] #root { filter: url(#protanopia-filter); }
+html[data-color-blind="deuteranopia"] #root { filter: url(#deuteranopia-filter); }
+html[data-color-blind="tritanopia"] #root { filter: url(#tritanopia-filter); }
+
+/* --- Focus Assist --- */
+html.focus-assist .panel-section {
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+html.focus-assist .panel-section:hover,
+html.focus-assist .panel-section:focus-within {
+  opacity: 1;
+}
+
+@keyframes focusPulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--theme-accent); }
+  50% { box-shadow: 0 0 0 4px var(--theme-accent), 0 0 12px rgba(10,132,255,0.3); }
+}
+
+html.focus-assist .panel-section:focus-within {
+  animation: focusPulse 2s ease-in-out infinite;
 }

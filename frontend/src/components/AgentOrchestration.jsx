@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Play, Activity } from 'lucide-react'
+import { theme, alpha } from '../design'
 
 // Pentagon layout coordinates (SVG viewBox 700x500)
 const NODES = [
-  { id: 'intake',        label: 'INTAKE',   sub: 'NLP Extraction',    color: '#60a5fa', cx: 140, cy: 160 },
-  { id: 'analyst',       label: 'ANALYST',  sub: 'Pattern Detection',  color: '#fb923c', cx: 350, cy: 75  },
-  { id: 'research',      label: 'RESEARCH', sub: 'Investigation',      color: '#a78bfa', cx: 560, cy: 160 },
-  { id: 'response',      label: 'RESPONSE', sub: 'SitRep & Alerts',    color: '#4ade80', cx: 490, cy: 380 },
-  { id: 'accessibility', label: 'ACCESS',   sub: 'Adaptive Delivery',  color: '#2dd4bf', cx: 210, cy: 380 },
+  { id: 'intake',        sub: 'NLP Extraction',    cx: 140, cy: 160 },
+  { id: 'analyst',       sub: 'Pattern Detection',  cx: 350, cy: 75  },
+  { id: 'research',      sub: 'Investigation',      cx: 560, cy: 160 },
+  { id: 'response',      sub: 'SitRep & Alerts',    cx: 490, cy: 380 },
+  { id: 'accessibility', sub: 'Adaptive Delivery',  cx: 210, cy: 380 },
 ]
 
 const EDGES = [
@@ -19,6 +20,14 @@ const EDGES = [
 
 const nodeMap = Object.fromEntries(NODES.map((n) => [n.id, n]))
 const R = 36
+
+function getNodeColor(id) {
+  return theme.agents[id]?.color || theme.colors.textTertiary
+}
+
+function getNodeLabel(id) {
+  return theme.agents[id]?.label || id.toUpperCase()
+}
 
 function formatTime(ts) {
   if (!ts) return '--:--'
@@ -59,43 +68,47 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
 
   // Auto-scroll feed
   useEffect(() => {
-    if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
+    if (feedRef.current) {
+      feedRef.current.scrollTo({
+        top: feedRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
   }, [events])
 
   const recentEvents = events.slice(-40)
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: '#020617', color: '#e2e8f0' }}>
+    <div style={{ display: 'flex', height: '100%', background: theme.colors.bg, color: theme.colors.text }} role="region" aria-label="Agent orchestration pipeline">
       {/* Left: SVG Pipeline Diagram */}
       <div style={{ flex: '1 1 65%', display: 'flex', flexDirection: 'column' }}>
         {/* Header bar */}
         <div
+          className="frosted-glass"
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 12,
             padding: '10px 20px',
-            borderBottom: '1px solid #1e293b',
-            background: '#0f172a',
+            background: theme.glass.background,
           }}
         >
           <button
             onClick={onBack}
+            aria-label="Back to dashboard"
+            className="btn-pill"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '5px 12px',
+              padding: '6px 14px',
               fontSize: 12,
               fontWeight: 600,
-              borderRadius: 6,
-              background: '#1e293b',
-              color: '#94a3b8',
-              border: '1px solid #334155',
-              cursor: 'pointer',
+              background: theme.colors.surfaceHover,
+              color: theme.colors.textSecondary,
             }}
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={14} aria-hidden="true" />
             Dashboard
           </button>
           <span
@@ -103,7 +116,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               flex: 1,
               textAlign: 'center',
               fontSize: 11,
-              color: '#475569',
+              color: theme.colors.textTertiary,
               textTransform: 'uppercase',
               letterSpacing: 3,
               fontWeight: 700,
@@ -114,22 +127,20 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
           <button
             onClick={onRunDemo}
             disabled={demoLoading}
+            aria-label={demoLoading ? 'Demo running' : 'Run demo simulation'}
+            className="btn-pill"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '5px 14px',
+              padding: '6px 14px',
               fontSize: 12,
               fontWeight: 700,
-              borderRadius: 6,
-              background: '#7f1d1d30',
-              color: '#f87171',
-              border: '1px solid #7f1d1d50',
-              cursor: demoLoading ? 'not-allowed' : 'pointer',
-              opacity: demoLoading ? 0.5 : 1,
+              background: alpha(theme.colors.accentRed, 0.12),
+              color: theme.colors.accentRed,
             }}
           >
-            <Play size={14} />
+            <Play size={14} aria-hidden="true" />
             {demoLoading ? 'RUNNING...' : 'RUN DEMO'}
           </button>
         </div>
@@ -151,24 +162,27 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
           >
             <defs>
               {/* Glow filter per agent */}
-              {NODES.map((n) => (
-                <filter
-                  key={n.id}
-                  id={`glow-${n.id}`}
-                  x="-80%"
-                  y="-80%"
-                  width="260%"
-                  height="260%"
-                >
-                  <feGaussianBlur stdDeviation="6" result="b" />
-                  <feFlood floodColor={n.color} floodOpacity="0.5" />
-                  <feComposite in2="b" operator="in" />
-                  <feMerge>
-                    <feMergeNode />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              ))}
+              {NODES.map((n) => {
+                const color = getNodeColor(n.id)
+                return (
+                  <filter
+                    key={n.id}
+                    id={`glow-${n.id}`}
+                    x="-80%"
+                    y="-80%"
+                    width="260%"
+                    height="260%"
+                  >
+                    <feGaussianBlur stdDeviation="8" result="b" />
+                    <feFlood floodColor={color} floodOpacity="0.35" />
+                    <feComposite in2="b" operator="in" />
+                    <feMerge>
+                      <feMergeNode />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                )
+              })}
               {/* Subtle grid pattern */}
               <pattern
                 id="grid"
@@ -179,7 +193,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                 <path
                   d="M 30 0 L 0 0 0 30"
                   fill="none"
-                  stroke="#1e293b"
+                  stroke={theme.colors.border}
                   strokeWidth="0.3"
                 />
               </pattern>
@@ -193,7 +207,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               x="350"
               y="235"
               textAnchor="middle"
-              fill="#0f172a"
+              fill={theme.colors.surface}
               fontSize="38"
               fontWeight="900"
               letterSpacing="6"
@@ -205,7 +219,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               x="350"
               y="258"
               textAnchor="middle"
-              fill="#0f172a"
+              fill={theme.colors.surface}
               fontSize="9"
               letterSpacing="3"
             >
@@ -224,6 +238,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               const x2 = t.cx - (dx / dist) * (R + 6)
               const y2 = t.cy - (dy / dist) * (R + 6)
               const active = activeAgents[from] || activeAgents[to]
+              const fromColor = getNodeColor(from)
 
               return (
                 <g key={`${from}-${to}`}>
@@ -233,7 +248,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     y1={y1}
                     x2={x2}
                     y2={y2}
-                    stroke={active ? '#334155' : '#1e293b'}
+                    stroke={active ? theme.colors.surfaceActive : theme.colors.border}
                     strokeWidth={active ? 1.5 : 0.8}
                   />
                   {/* Animated flow */}
@@ -243,7 +258,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       y1={y1}
                       x2={x2}
                       y2={y2}
-                      stroke={f.color}
+                      stroke={fromColor}
                       strokeWidth="2"
                       strokeDasharray="6 14"
                       opacity="0.8"
@@ -252,7 +267,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                         attributeName="stroke-dashoffset"
                         from="0"
                         to="-20"
-                        dur="0.7s"
+                        dur="1.2s"
                         repeatCount="indefinite"
                       />
                     </line>
@@ -263,7 +278,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       x={(x1 + x2) / 2}
                       y={(y1 + y2) / 2 - 8}
                       textAnchor="middle"
-                      fill="#475569"
+                      fill={theme.colors.textTertiary}
                       fontSize="7"
                       letterSpacing="1"
                     >
@@ -283,6 +298,8 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
             {/* Agent nodes */}
             {NODES.map((n) => {
               const active = activeAgents[n.id]
+              const color = getNodeColor(n.id)
+              const label = getNodeLabel(n.id)
               return (
                 <g key={n.id}>
                   {/* Pulsing outer ring when active */}
@@ -292,19 +309,19 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       cy={n.cy}
                       r={R + 14}
                       fill="none"
-                      stroke={n.color}
-                      strokeWidth="1.5"
+                      stroke={color}
+                      strokeWidth="1"
                     >
                       <animate
                         attributeName="r"
-                        values={`${R + 8};${R + 18};${R + 8}`}
-                        dur="2s"
+                        values={`${R + 10};${R + 16};${R + 10}`}
+                        dur="3s"
                         repeatCount="indefinite"
                       />
                       <animate
                         attributeName="opacity"
-                        values="0.35;0.08;0.35"
-                        dur="2s"
+                        values="0.25;0.06;0.25"
+                        dur="3s"
                         repeatCount="indefinite"
                       />
                     </circle>
@@ -315,8 +332,8 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     cx={n.cx}
                     cy={n.cy}
                     r={R}
-                    fill={active ? `${n.color}18` : '#0f172a'}
-                    stroke={n.color}
+                    fill={active ? alpha(color, 0.09) : theme.colors.surface}
+                    stroke={color}
                     strokeWidth={active ? 2.5 : 1}
                     opacity={active ? 1 : 0.4}
                     filter={active ? `url(#glow-${n.id})` : undefined}
@@ -328,13 +345,13 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     y={n.cy + 1}
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fill={n.color}
+                    fill={color}
                     fontSize="18"
                     fontWeight="bold"
                     fontFamily="monospace"
                     opacity={active ? 1 : 0.5}
                   >
-                    {n.label.charAt(0)}
+                    {label.charAt(0)}
                   </text>
 
                   {/* Label */}
@@ -342,12 +359,12 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     x={n.cx}
                     y={n.cy + R + 16}
                     textAnchor="middle"
-                    fill={active ? '#e2e8f0' : '#64748b'}
+                    fill={active ? theme.colors.text : theme.colors.textTertiary}
                     fontSize="10"
                     fontWeight="700"
                     letterSpacing="1.5"
                   >
-                    {n.label}
+                    {label}
                   </text>
 
                   {/* Sub-label */}
@@ -355,7 +372,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     x={n.cx}
                     y={n.cy + R + 28}
                     textAnchor="middle"
-                    fill="#475569"
+                    fill={theme.colors.textTertiary}
                     fontSize="8"
                   >
                     {n.sub}
@@ -367,12 +384,12 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       cx={n.cx + R - 6}
                       cy={n.cy - R + 6}
                       r="4"
-                      fill={n.color}
+                      fill={color}
                     >
                       <animate
                         attributeName="opacity"
-                        values="1;0.3;1"
-                        dur="1s"
+                        values="1;0.5;1"
+                        dur="2s"
                         repeatCount="indefinite"
                       />
                     </circle>
@@ -388,10 +405,9 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
       <div
         style={{
           width: 320,
-          borderLeft: '1px solid #1e293b',
           display: 'flex',
           flexDirection: 'column',
-          background: '#0f172a',
+          background: theme.colors.surface,
         }}
       >
         {/* Feed header */}
@@ -400,23 +416,23 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '10px 14px',
-            borderBottom: '1px solid #1e293b',
+            padding: '12px 16px',
+            backgroundColor: alpha(theme.colors.surface, 0.8),
           }}
         >
-          <Activity size={14} color="#22c55e" className="animate-pulse" />
+          <Activity size={14} color={theme.colors.accentGreen} className="animate-pulse" aria-hidden="true" />
           <span
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: '#64748b',
+              color: theme.colors.textTertiary,
               textTransform: 'uppercase',
               letterSpacing: 1.5,
             }}
           >
             Pipeline Activity
           </span>
-          <span style={{ marginLeft: 'auto', fontSize: 10, color: '#334155' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: theme.colors.surfaceActive }}>
             {events.length}
           </span>
         </div>
@@ -424,13 +440,16 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
         {/* Event list */}
         <div
           ref={feedRef}
+          role="log"
+          aria-live="polite"
+          aria-label="Pipeline activity feed"
           style={{ flex: 1, overflowY: 'auto', padding: 8 }}
         >
           {recentEvents.length === 0 && (
             <div
               style={{
                 textAlign: 'center',
-                color: '#334155',
+                color: theme.colors.surfaceActive,
                 fontSize: 12,
                 marginTop: 48,
               }}
@@ -440,19 +459,21 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
           )}
           {recentEvents.map((ev, i) => {
             const node = nodeMap[ev.agent]
-            const color = node?.color || '#64748b'
+            const color = node ? getNodeColor(node.id) : theme.colors.textTertiary
+            const label = node ? getNodeLabel(node.id) : (ev.agent?.toUpperCase() || '?')
             const isHighSev =
               ev.severity === 'alert' || ev.severity === 'critical'
+            const sevStyle = theme.severity[ev.severity]
             return (
               <div
-                key={ev.id || i}
+                key={ev._uid || `${ev.id}-${i}`}
                 className="event-card"
                 style={{
                   padding: '6px 10px',
                   marginBottom: 4,
                   borderRadius: 6,
                   borderLeft: `2px solid ${color}`,
-                  background: isHighSev ? '#7f1d1d12' : '#1e293b30',
+                  background: isHighSev ? alpha(theme.colors.accentRed, 0.07) : alpha(theme.colors.surface, 0.19),
                 }}
               >
                 <div
@@ -471,9 +492,9 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       letterSpacing: 1,
                     }}
                   >
-                    {node?.label || ev.agent?.toUpperCase() || '?'}
+                    {label}
                   </span>
-                  {ev.severity && ev.severity !== 'info' && (
+                  {ev.severity && ev.severity !== 'info' && sevStyle && (
                     <span
                       style={{
                         fontSize: 8,
@@ -481,8 +502,8 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                         padding: '1px 5px',
                         borderRadius: 3,
                         textTransform: 'uppercase',
-                        background: isHighSev ? '#7f1d1d30' : '#78350f30',
-                        color: isHighSev ? '#f87171' : '#fbbf24',
+                        background: sevStyle.bg,
+                        color: sevStyle.text,
                       }}
                     >
                       {ev.severity}
@@ -492,7 +513,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     style={{
                       marginLeft: 'auto',
                       fontSize: 9,
-                      color: '#334155',
+                      color: theme.colors.surfaceActive,
                       fontFamily: 'monospace',
                     }}
                   >
@@ -500,7 +521,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                   </span>
                 </div>
                 <div
-                  style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.4 }}
+                  style={{ fontSize: 11, color: theme.colors.textSecondary, lineHeight: 1.4 }}
                 >
                   {ev.message}
                 </div>

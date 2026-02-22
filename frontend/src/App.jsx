@@ -10,24 +10,30 @@ import {
   Zap,
   Play,
   Languages,
+  Accessibility,
 } from 'lucide-react'
 import SurveillanceMap from './components/map/SurveillanceMap'
 import AgentFeed from './components/feed/AgentFeed'
 import AlertPanel from './components/alerts/AlertPanel'
 import IntakePanel from './components/intake/IntakePanel'
 import AgentOrchestration from './components/AgentOrchestration'
+import AccessibilityPanel from './components/accessibility/AccessibilityPanel'
+import KeyboardShortcuts from './components/accessibility/KeyboardShortcuts'
+import VoiceCommands from './components/accessibility/VoiceCommands'
+import { useAccessibility } from './contexts/AccessibilityContext'
 import { t, LANG_OPTIONS } from './i18n'
+import { theme, alpha } from './design'
 
 const API = 'http://localhost:8111'
 const WS_URL = 'ws://localhost:8111/ws/feed'
 
 function getThreatLevel(clusters) {
-  if (!clusters.length) return { label: 'CLEAR', cls: 'text-green-400 bg-green-500/10 border-green-500/30' }
+  if (!clusters.length) return { label: 'CLEAR', style: theme.severity.clear }
   const maxAnomaly = Math.max(...clusters.filter(c => c.status === 'active').map((c) => c.anomaly_score || 0))
-  if (maxAnomaly > 100) return { label: 'CRITICAL', cls: 'text-red-400 bg-red-500/15 border-red-500/30 threat-critical' }
-  if (maxAnomaly > 50) return { label: 'HIGH', cls: 'text-orange-400 bg-orange-500/10 border-orange-500/30' }
-  if (maxAnomaly > 10) return { label: 'MODERATE', cls: 'text-amber-400 bg-amber-500/10 border-amber-500/30' }
-  return { label: 'LOW', cls: 'text-green-400 bg-green-500/10 border-green-500/30' }
+  if (maxAnomaly > 100) return { label: 'CRITICAL', style: theme.severity.critical, className: 'threat-critical' }
+  if (maxAnomaly > 50) return { label: 'HIGH', style: theme.severity.alert }
+  if (maxAnomaly > 10) return { label: 'MODERATE', style: theme.severity.moderate }
+  return { label: 'LOW', style: theme.severity.low }
 }
 
 function MetricsBar({ encounters, clusters, events, language = 'en' }) {
@@ -49,60 +55,71 @@ function MetricsBar({ encounters, clusters, events, language = 'en' }) {
   }
 
   return (
-    <div className="flex items-center gap-4 px-5 py-1.5 bg-slate-900/60 border-b border-slate-700/30 shrink-0 text-[11px]">
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Users className="w-3 h-3" />
-        <span className="text-slate-500">{t(language, 'encounters')}:</span>
-        <span className="text-slate-200 font-bold metric-value">{encounters.length}</span>
+    <nav
+      aria-label={t(language, 'encounters') + ' metrics'}
+      className="flex items-center gap-6 px-6 py-2 shrink-0 frosted-glass"
+      style={{
+        backgroundColor: theme.glass.background,
+        fontSize: '14px',
+      }}
+    >
+      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
+        <Users className="w-3.5 h-3.5" aria-hidden="true" />
+        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'encounters')}:</span>
+        <span className="font-bold metric-value" style={{ color: theme.colors.text }}>{encounters.length}</span>
       </div>
 
-      <div className="w-px h-3 bg-slate-700/50" />
-
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <AlertTriangle className="w-3 h-3" />
-        <span className="text-slate-500">{t(language, 'activeClusters')}:</span>
-        <span className="text-slate-200 font-bold">{activeClusters.length}</span>
+      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
+        <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
+        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'activeClusters')}:</span>
+        <span className="font-bold" style={{ color: theme.colors.text }}>{activeClusters.length}</span>
       </div>
 
-      <div className="w-px h-3 bg-slate-700/50" />
-
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Radio className="w-3 h-3 text-green-500" />
-        <span className="text-slate-500">{t(language, 'agents')}:</span>
-        <span className="text-green-400 font-bold">5/5 ONLINE</span>
+      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
+        <Radio className="w-3.5 h-3.5" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
+        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'agents')}:</span>
+        <span className="font-bold" style={{ color: theme.colors.accentGreen }}>5/5 ONLINE</span>
       </div>
 
-      <div className="w-px h-3 bg-slate-700/50" />
-
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Zap className="w-3 h-3" />
-        <span className="text-slate-500">{t(language, 'threat')}:</span>
-        <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${threat.cls}`}>
+      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
+        <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'threat')}:</span>
+        <span
+          className={`px-2 py-0.5 font-bold rounded ${threat.className || ''}`}
+          style={{
+            color: threat.style.text,
+            backgroundColor: threat.style.bg,
+            fontSize: '12px',
+          }}
+        >
           {threat.label}
         </span>
       </div>
 
-      <div className="w-px h-3 bg-slate-700/50" />
-
-      <div className="flex items-center gap-1.5 text-slate-400">
-        <Clock className="w-3 h-3" />
-        <span className="text-slate-500">{t(language, 'lastEvent')}:</span>
-        <span className="text-slate-300 font-mono tabular-nums">{lastTime}</span>
+      <div className="flex items-center gap-1.5" style={{ color: theme.colors.textSecondary }}>
+        <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+        <span style={{ color: theme.colors.textTertiary }}>{t(language, 'lastEvent')}:</span>
+        <span style={{ color: theme.colors.text, fontFamily: theme.font.mono.family, fontSize: '13px' }}>{lastTime}</span>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
         <button
           onClick={triggerAccessibilityDemo}
           disabled={demoLoading}
-          className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded
-                     bg-teal-600/20 text-teal-400 border border-teal-600/30
-                     hover:bg-teal-600/30 disabled:opacity-50 cursor-pointer transition-colors"
+          aria-label={t(language, 'accessibilityDemo')}
+          className="btn-pill flex items-center gap-1.5"
+          style={{
+            backgroundColor: alpha(theme.agents.accessibility.color, 0.15),
+            color: theme.agents.accessibility.color,
+            padding: '6px 14px',
+            fontSize: '13px',
+          }}
         >
-          <Globe className="w-3 h-3" />
+          <Globe className="w-3.5 h-3.5" aria-hidden="true" />
           {demoLoading ? t(language, 'running') : t(language, 'accessibilityDemo')}
         </button>
       </div>
-    </div>
+    </nav>
   )
 }
 
@@ -113,10 +130,18 @@ export default function App() {
   const seenEventIds = useRef(new Set())
   const wsRef = useRef(null)
 
+  const uidCounter = useRef(0)
+
+  const { settings, updateSetting } = useAccessibility()
+  const language = settings.language
+
+  const [showA11yPanel, setShowA11yPanel] = useState(false)
+
   const addEvent = useCallback((event) => {
-    const key = event.id || `${event.timestamp}-${event.agent}-${event.message}`
-    if (seenEventIds.current.has(key)) return
-    seenEventIds.current.add(key)
+    const dedupKey = event.id || `${event.timestamp}-${event.agent}-${event.message}`
+    if (seenEventIds.current.has(dedupKey)) return
+    seenEventIds.current.add(dedupKey)
+    event._uid = `${Date.now()}-${++uidCounter.current}`
     setEvents((prev) => [...prev, event].slice(-300))
   }, [])
 
@@ -202,7 +227,7 @@ export default function App() {
         const res = await fetch(`${API}/intake`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lat: 23.71, lng: 90.41 }),
+          body: JSON.stringify({ text, lat: 23.7945, lng: 90.3620 }),
         })
         if (res.ok) {
           fetchData()
@@ -220,7 +245,6 @@ export default function App() {
 
   const [demoLoading, setDemoLoading] = useState(false)
   const [showOrchestration, setShowOrchestration] = useState(false)
-  const [language, setLanguage] = useState('en')
   const [feedSplit, setFeedSplit] = useState(55)
   const rightColRef = useRef(null)
 
@@ -252,8 +276,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: "This is CHW Fatima in Mirpur-12. I saw 6 patients today, all with severe watery diarrhea and vomiting. Three are children under 5. One elderly woman is severely dehydrated and cannot keep fluids down. They all live near the Bhashantek canal. Symptoms started 2-3 days ago. I've never seen this many cases at once.",
-          lat: 23.812,
-          lng: 90.368,
+          lat: 23.8042,
+          lng: 90.3687,
         }),
       })
       fetchData()
@@ -266,9 +290,14 @@ export default function App() {
     }
   }, [fetchData])
 
+  const handleCloseModals = useCallback(() => {
+    setShowA11yPanel(false)
+    setShowOrchestration(false)
+  }, [])
+
   if (showOrchestration) {
     return (
-      <div className="h-screen w-screen bg-slate-950">
+      <div className="h-screen w-screen view-fade-enter" style={{ backgroundColor: theme.colors.bg }}>
         <AgentOrchestration
           events={events}
           onRunDemo={handleRunDemo}
@@ -280,88 +309,197 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-950">
-      {/* Header */}
-      <header className="flex items-center gap-3 px-5 py-2.5 bg-slate-900 border-b border-slate-700/50 shrink-0">
-        <Shield className="w-6 h-6 text-red-500" />
+    <div className="h-screen w-screen flex flex-col" style={{ backgroundColor: theme.colors.bg }}>
+      {/* Skip to content */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
+      {/* Header — 48px frosted glass */}
+      <header
+        role="banner"
+        className="flex items-center gap-4 px-6 shrink-0 frosted-glass stagger-1"
+        style={{
+          height: '48px',
+          backgroundColor: theme.glass.background,
+        }}
+      >
+        <Shield className="w-5 h-5" style={{ color: theme.colors.accentRed }} aria-hidden="true" />
         <div>
-          <h1 className="text-lg font-bold tracking-wide text-slate-100">
+          <h1
+            style={{
+              color: theme.colors.text,
+              fontSize: '21px',
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              lineHeight: 1.19,
+            }}
+          >
             SENTINEL
           </h1>
-          <p className="text-[11px] text-slate-400 -mt-0.5 tracking-widest uppercase">
+          <p
+            className="-mt-0.5 uppercase"
+            style={{
+              color: theme.colors.textSecondary,
+              fontSize: '14px',
+              fontWeight: 400,
+              letterSpacing: '0.15em',
+            }}
+          >
             {t(language, 'subtitle')}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {/* Accessibility button — secondary pill */}
+          <button
+            onClick={() => setShowA11yPanel(true)}
+            aria-label={t(language, 'accessibilitySettings')}
+            className="btn-pill flex items-center gap-1.5"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.agents.accessibility.color,
+              padding: '8px 18px',
+              fontSize: '14px',
+            }}
+          >
+            <Accessibility className="w-4 h-4" aria-hidden="true" />
+            {t(language, 'accessibility')}
+          </button>
+
+          {/* Language selector */}
           <div className="flex items-center gap-1.5">
-            <Languages className="w-3.5 h-3.5 text-slate-500" />
+            <Languages className="w-4 h-4" style={{ color: theme.colors.textTertiary }} aria-hidden="true" />
             <select
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="bg-slate-800 text-slate-300 text-xs border border-slate-700/50 rounded px-2 py-1 outline-none cursor-pointer"
+              onChange={(e) => updateSetting('language', e.target.value)}
+              aria-label={t(language, 'languageLabel')}
+              className="outline-none cursor-pointer"
+              style={{
+                backgroundColor: theme.colors.surfaceHover,
+                color: theme.colors.text,
+                fontSize: '14px',
+                fontWeight: 400,
+                borderRadius: '980px',
+                padding: '6px 14px',
+                border: 'none',
+              }}
             >
               {LANG_OPTIONS.map((opt) => (
                 <option key={opt.code} value={opt.code}>{opt.label}</option>
               ))}
             </select>
           </div>
+
+          {/* Run Demo — primary pill */}
           <button
             onClick={handleRunDemo}
             disabled={demoLoading}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded
-                       bg-red-600/20 text-red-400 border border-red-600/30
-                       hover:bg-red-600/30 disabled:opacity-50 cursor-pointer transition-colors"
+            data-action="run-demo"
+            aria-label={t(language, 'runDemo')}
+            className="btn-pill flex items-center gap-1.5"
+            style={{
+              backgroundColor: alpha(theme.colors.accentRed, 0.15),
+              color: theme.colors.accentRed,
+              padding: '8px 18px',
+              fontSize: '14px',
+            }}
           >
-            <Play className="w-3.5 h-3.5" />
+            <Play className="w-4 h-4" aria-hidden="true" />
             {demoLoading ? t(language, 'running') : t(language, 'runDemo')}
           </button>
+
+          {/* Agent View — secondary pill */}
           <button
             onClick={() => setShowOrchestration(true)}
-            className="agent-view-btn flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded
-                       bg-purple-600/20 text-purple-400 border border-purple-600/30
-                       hover:bg-purple-600/30 cursor-pointer transition-colors"
+            aria-label="Agent orchestration view"
+            className="agent-view-btn btn-pill flex items-center gap-1.5"
+            style={{
+              backgroundColor: alpha(theme.agents.research.color, 0.12),
+              color: theme.agents.research.color,
+              padding: '8px 18px',
+              fontSize: '14px',
+            }}
           >
-            🧠 Agent View
+            Agent View
           </button>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
+
+          <div className="flex items-center gap-2" style={{ color: theme.colors.textTertiary, fontSize: '14px' }} aria-live="polite">
+            <Activity className="w-4 h-4 animate-pulse" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
             <span>{encounters.length} {t(language, 'encounters').toLowerCase()}</span>
-            <span className="text-slate-700">|</span>
+            <span style={{ color: theme.colors.textTertiary, opacity: 0.4 }} aria-hidden="true">|</span>
             <span>{clusters.length} clusters</span>
           </div>
         </div>
       </header>
 
       {/* Metrics Bar */}
-      <MetricsBar encounters={encounters} clusters={clusters} events={events} language={language} />
+      <div className="stagger-2">
+        <MetricsBar encounters={encounters} clusters={clusters} events={events} language={language} />
+      </div>
 
       {/* Main content */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left: Map (60%) */}
-        <div className="w-[60%] relative">
+      <main id="main-content" className="flex flex-1 min-h-0">
+        {/* Left: Map (60%) — full bleed */}
+        <section
+          aria-label="Disease surveillance map showing encounter locations in Dhaka"
+          className="w-[60%] relative panel-section stagger-3"
+        >
           <SurveillanceMap encounters={encounters} clusters={clusters} />
           <IntakePanel onSubmit={handleIntakeSubmit} language={language} />
-        </div>
+        </section>
 
         {/* Right: Feed + Alerts (40%) — resizable */}
-        <div ref={rightColRef} className="w-[40%] flex flex-col border-l border-slate-700/50">
+        <aside
+          ref={rightColRef}
+          aria-label="Agent activity and alerts"
+          className="w-[40%] flex flex-col"
+        >
           {/* Top: Agent Feed */}
-          <div style={{ height: `${feedSplit}%` }} className="min-h-0">
+          <section
+            data-section="agent-feed"
+            tabIndex={-1}
+            aria-label={t(language, 'agentActivity')}
+            style={{ height: `${feedSplit}%` }}
+            className="min-h-0 panel-section stagger-4"
+          >
             <AgentFeed events={events} language={language} />
-          </div>
+          </section>
           {/* Drag handle */}
           <div
             onMouseDown={handleDragStart}
-            className="h-1.5 bg-slate-800/80 hover:bg-slate-600 cursor-row-resize shrink-0 flex items-center justify-center group border-y border-slate-700/30"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize panels"
+            tabIndex={0}
+            className="h-2 cursor-row-resize shrink-0 flex items-center justify-center"
+            style={{
+              backgroundColor: theme.colors.bg,
+            }}
           >
-            <div className="w-8 h-0.5 bg-slate-600 group-hover:bg-slate-400 rounded-full transition-colors" />
+            <div
+              className="w-8 h-0.5 rounded-full transition-colors"
+              style={{ backgroundColor: theme.colors.surfaceActive }}
+            />
           </div>
           {/* Bottom: Alerts */}
-          <div style={{ height: `${100 - feedSplit}%` }} className="min-h-0">
-            <AlertPanel clusters={clusters} encounters={encounters} language={language} />
-          </div>
-        </div>
-      </div>
+          <section
+            aria-label={t(language, 'activeAlerts')}
+            style={{ height: `${100 - feedSplit}%` }}
+            className="min-h-0 panel-section stagger-5"
+          >
+            <AlertPanel clusters={clusters} language={language} />
+          </section>
+        </aside>
+      </main>
+
+      {/* Accessibility Panel */}
+      <AccessibilityPanel isOpen={showA11yPanel} onClose={() => setShowA11yPanel(false)} />
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcuts onClose={handleCloseModals} />
+
+      {/* Voice Commands */}
+      <VoiceCommands />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Mic, MicOff, Loader2 } from 'lucide-react'
 import { t, SPEECH_LANG } from '../../i18n'
+import { theme, alpha } from '../../design'
 
 export default function IntakePanel({ onSubmit, language = 'en' }) {
   const [text, setText] = useState('')
@@ -92,21 +93,33 @@ export default function IntakePanel({ onSubmit, language = 'en' }) {
   const displayText = listening && interim ? interim : text
 
   return (
-    <div className="absolute bottom-4 left-4 right-4 z-[1000]">
+    <div className="absolute bottom-5 left-5 right-5 z-[1000]">
       <form
         onSubmit={handleSubmit}
-        className="flex items-center gap-2 bg-slate-900/95 backdrop-blur border border-slate-700/50 rounded-xl px-3 py-2 shadow-2xl"
+        aria-label="Submit a health report"
+        className="flex items-center gap-3 frosted-glass"
+        style={{
+          backgroundColor: theme.glass.background,
+          borderRadius: theme.radius.xl,
+          padding: '10px 12px 10px 20px',
+          boxShadow: theme.shadow.elevated,
+        }}
       >
         <button
           type="button"
           onClick={toggleVoice}
-          className={`shrink-0 p-2 rounded-lg transition-colors cursor-pointer ${
-            listening
-              ? 'bg-red-500/20 text-red-400 animate-pulse'
-              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-          }`}
+          aria-label={listening ? 'Stop voice input' : 'Start voice input'}
+          aria-pressed={listening}
+          className={`shrink-0 btn-pill flex items-center justify-center ${listening ? 'animate-pulse' : ''}`}
+          style={{
+            width: '36px',
+            height: '36px',
+            padding: 0,
+            backgroundColor: listening ? alpha(theme.colors.accentRed, 0.2) : theme.colors.surfaceHover,
+            color: listening ? theme.colors.accentRed : theme.colors.textSecondary,
+          }}
         >
-          {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          {listening ? <MicOff className="w-4 h-4" aria-hidden="true" /> : <Mic className="w-4 h-4" aria-hidden="true" />}
         </button>
 
         <div className="flex-1 relative">
@@ -115,26 +128,50 @@ export default function IntakePanel({ onSubmit, language = 'en' }) {
             value={displayText}
             onChange={(e) => setText(e.target.value)}
             placeholder={t(language, 'intakePlaceholder')}
-            className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
+            aria-label="Health report text"
+            data-action="intake-input"
+            className="w-full bg-transparent outline-none intake-input"
+            style={{
+              color: theme.colors.text,
+              fontSize: '17px',
+              fontWeight: 400,
+            }}
             disabled={loading || listening}
           />
           {listening && (
-            <div className="absolute -top-7 left-0 flex items-center gap-1.5 text-[10px] text-red-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            <div
+              className="absolute -top-7 left-0 flex items-center gap-1.5"
+              style={{ color: theme.colors.accentRed, fontSize: '12px' }}
+              aria-live="polite"
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full animate-pulse"
+                style={{ backgroundColor: theme.colors.accentRed }}
+                aria-hidden="true"
+              />
               {t(language, 'listening')}
             </div>
           )}
         </div>
 
+        {/* Submit — primary pill, Apple blue */}
         <button
           type="submit"
           disabled={!text.trim() || loading || listening}
-          className="shrink-0 p-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          aria-label={loading ? 'Submitting report' : 'Submit report'}
+          className="shrink-0 btn-pill flex items-center justify-center"
+          style={{
+            width: '40px',
+            height: '40px',
+            padding: 0,
+            backgroundColor: theme.colors.accent,
+            color: '#fff',
+          }}
         >
           {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
           ) : (
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4" aria-hidden="true" />
           )}
         </button>
       </form>

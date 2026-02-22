@@ -328,7 +328,7 @@ async def _run_intake_pipeline(enc_id, extracted, symptoms_list, location, lang)
             await log_event_async(
                 "research",
                 f"Initiating epidemiological investigation of {main_cluster.get('probable_disease', 'unknown').upper()} cluster. "
-                f"Querying Claude for differential diagnosis and environmental analysis...",
+                f"Querying API for differential diagnosis and environmental analysis...",
                 "info",
                 main_cluster.get("id"),
             )
@@ -568,7 +568,7 @@ async def get_sitrep(cluster_id: int):
     )
 
     try:
-        sitrep = generate_sitrep(cluster, encounters_list)
+        sitrep = await asyncio.to_thread(generate_sitrep, cluster, encounters_list)
     except Exception as e:
         await log_event_async("response", f"SitRep generation failed: {str(e)}", "warning", cluster_id)
         return {"error": f"Failed to generate SitRep: {str(e)}"}

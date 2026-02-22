@@ -1,34 +1,69 @@
-import { useState, useMemo } from 'react'
-import { AlertTriangle, TrendingUp, FileText, X, Loader2 } from 'lucide-react'
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts'
+import { useState, useEffect, useRef } from 'react'
+import {
+  AlertTriangle,
+  TrendingUp,
+  FileText,
+  X,
+  Loader2,
+  Volume2,
+  Triangle,
+  Circle,
+} from 'lucide-react'
 import { t } from '../../i18n'
+import { useAccessibility } from '../../contexts/AccessibilityContext'
+import { useTTS } from '../accessibility/TextToSpeech'
+import { simplifyAlertCard, simplifyAnomalyScore } from '../accessibility/SimpleViewTransforms'
+import { theme, alpha } from '../../design'
 
 const API = 'http://localhost:8111'
 
-function SeverityBadge({ anomalyScore }) {
-  if (anomalyScore > 100) {
-    return (
-      <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
-        Critical
-      </span>
-    )
-  }
+function SeverityBadge({ anomalyScore, simpleView }) {
+  const isCritical = anomalyScore > 100
+  const sev = isCritical ? theme.severity.critical : theme.severity.warning
+
   return (
-    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
-      Warning
+    <span
+      className="flex items-center gap-1"
+      style={{
+        backgroundColor: sev.bg,
+        color: sev.text,
+        fontSize: '11px',
+        fontWeight: 600,
+        padding: '3px 10px',
+        borderRadius: '980px',
+        textTransform: 'uppercase',
+      }}
+    >
+      {isCritical ? (
+        <Triangle className="w-2.5 h-2.5 fill-current" aria-hidden="true" />
+      ) : (
+        <Circle className="w-2.5 h-2.5 fill-current" aria-hidden="true" />
+      )}
+      {simpleView ? simplifyAnomalyScore(anomalyScore).split(' — ')[0] : (isCritical ? 'Critical' : 'Warning')}
     </span>
   )
 }
 
 function ThreatBadge({ level }) {
-  const colors = {
-    CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/30',
-    HIGH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-    MODERATE: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    LOW: 'bg-green-500/20 text-green-400 border-green-500/30',
+  const levelMap = {
+    CRITICAL: theme.severity.critical,
+    HIGH: theme.severity.alert,
+    MODERATE: theme.severity.moderate,
+    LOW: theme.severity.low,
   }
+  const sev = levelMap[level] || levelMap.MODERATE
   return (
-    <span className={`px-2 py-0.5 text-xs font-bold uppercase rounded border ${colors[level] || colors.MODERATE}`}>
+    <span
+      style={{
+        backgroundColor: sev.bg,
+        color: sev.text,
+        fontSize: '12px',
+        fontWeight: 600,
+        padding: '3px 10px',
+        borderRadius: '980px',
+        textTransform: 'uppercase',
+      }}
+    >
       {level}
     </span>
   )
@@ -38,22 +73,37 @@ function SitRepModal({ sitrep, onClose }) {
   if (!sitrep) return null
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700/50 rounded-xl shadow-2xl w-[600px] max-h-[85vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-[2000] flex items-center justify-center view-fade-enter"
+      style={{ backgroundColor: alpha(theme.colors.bg, 0.6), backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+    >
+      <div
+        className="w-[600px] max-h-[85vh] flex flex-col frosted-glass"
+        style={{
+          backgroundColor: 'rgba(28, 28, 30, 0.72)',
+          borderRadius: theme.radius.lg,
+          boxShadow: theme.shadow.elevated,
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Situation Report: ${sitrep.title}`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 shrink-0">
           <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-green-400" />
+            <FileText className="w-5 h-5" style={{ color: theme.colors.accentGreen }} aria-hidden="true" />
             <div>
-              <h2 className="text-sm font-bold text-slate-100">{sitrep.title}</h2>
-              <p className="text-[10px] text-slate-500">{sitrep.generated_at}</p>
+              <h2 style={{ color: theme.colors.text, fontSize: '17px', fontWeight: 600 }}>{sitrep.title}</h2>
+              <p style={{ color: theme.colors.textTertiary, fontSize: '13px', marginTop: '2px' }}>{sitrep.generated_at}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <ThreatBadge level={sitrep.threat_level} />
             <button
               onClick={onClose}
-              className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
+              className="p-1.5 rounded-lg btn-icon"
+              style={{ color: theme.colors.textSecondary }}
+              aria-label="Close situation report"
             >
               <X className="w-4 h-4" />
             </button>
@@ -61,32 +111,54 @@ function SitRepModal({ sitrep, onClose }) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {/* Summary */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Summary</h3>
-            <p className="text-slate-200">{sitrep.summary}</p>
+            <h3
+              style={{
+                color: theme.colors.textSecondary,
+                fontSize: '12px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                marginBottom: '8px',
+              }}
+            >
+              Summary
+            </h3>
+            <p style={{ color: theme.colors.text, fontSize: '14px', lineHeight: 1.47 }}>{sitrep.summary}</p>
           </div>
 
           {/* Case Summary */}
           {sitrep.case_summary && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Case Summary</h3>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-slate-800/50 rounded p-2">
-                  <span className="text-slate-500">Total cases:</span>{' '}
-                  <span className="text-slate-200 font-bold">{sitrep.case_summary.total_cases}</span>
+              <h3
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '8px',
+                }}
+              >
+                Case Summary
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3" style={{ backgroundColor: alpha(theme.colors.surfaceHover, 0.5), borderRadius: theme.radius.sm }}>
+                  <span style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>Total cases:</span>{' '}
+                  <span className="font-bold" style={{ color: theme.colors.text, fontSize: '14px' }}>{sitrep.case_summary.total_cases}</span>
                 </div>
-                <div className="bg-slate-800/50 rounded p-2">
-                  <span className="text-slate-500">Trend:</span>{' '}
-                  <span className="text-slate-200 font-bold">{sitrep.case_summary.trend}</span>
+                <div className="p-3" style={{ backgroundColor: alpha(theme.colors.surfaceHover, 0.5), borderRadius: theme.radius.sm }}>
+                  <span style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>Trend:</span>{' '}
+                  <span className="font-bold" style={{ color: theme.colors.text, fontSize: '14px' }}>{sitrep.case_summary.trend}</span>
                 </div>
               </div>
               {sitrep.case_summary.severity_breakdown && (
-                <p className="text-xs text-slate-400 mt-1">{sitrep.case_summary.severity_breakdown}</p>
+                <p style={{ color: theme.colors.textSecondary, fontSize: '13px', lineHeight: 1.47, marginTop: '8px' }}>{sitrep.case_summary.severity_breakdown}</p>
               )}
               {sitrep.case_summary.date_range && (
-                <p className="text-xs text-slate-500 mt-0.5">{sitrep.case_summary.date_range}</p>
+                <p style={{ color: theme.colors.textTertiary, fontSize: '13px', marginTop: '4px' }}>{sitrep.case_summary.date_range}</p>
               )}
             </div>
           )}
@@ -94,25 +166,47 @@ function SitRepModal({ sitrep, onClose }) {
           {/* Disease Assessment */}
           {sitrep.disease_assessment && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Disease Assessment</h3>
-              <div className="space-y-1 text-xs">
+              <h3
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '8px',
+                }}
+              >
+                Disease Assessment
+              </h3>
+              <div className="space-y-1.5" style={{ fontSize: '14px', lineHeight: 1.47 }}>
                 <p>
-                  <span className="text-slate-500">Probable disease:</span>{' '}
-                  <span className="text-slate-200 font-semibold uppercase">{sitrep.disease_assessment.probable_disease}</span>
+                  <span style={{ color: theme.colors.textTertiary }}>Probable disease:</span>{' '}
+                  <span className="font-semibold uppercase" style={{ color: theme.colors.text }}>{sitrep.disease_assessment.probable_disease}</span>
                   {sitrep.disease_assessment.confidence && (
-                    <span className="text-slate-400"> ({sitrep.disease_assessment.confidence})</span>
+                    <span style={{ color: theme.colors.textSecondary }}> ({sitrep.disease_assessment.confidence})</span>
                   )}
                 </p>
                 {sitrep.disease_assessment.transmission_route && (
-                  <p><span className="text-slate-500">Transmission:</span> <span className="text-slate-300">{sitrep.disease_assessment.transmission_route}</span></p>
+                  <p><span style={{ color: theme.colors.textTertiary }}>Transmission:</span> <span style={{ color: theme.colors.text }}>{sitrep.disease_assessment.transmission_route}</span></p>
                 )}
                 {sitrep.disease_assessment.incubation_period && (
-                  <p><span className="text-slate-500">Incubation:</span> <span className="text-slate-300">{sitrep.disease_assessment.incubation_period}</span></p>
+                  <p><span style={{ color: theme.colors.textTertiary }}>Incubation:</span> <span style={{ color: theme.colors.text }}>{sitrep.disease_assessment.incubation_period}</span></p>
                 )}
                 {sitrep.disease_assessment.key_symptoms?.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {sitrep.disease_assessment.key_symptoms.map((s) => (
-                      <span key={s} className="px-1.5 py-0.5 text-[10px] bg-slate-800 text-slate-400 rounded border border-slate-700/50">{s}</span>
+                      <span
+                        key={s}
+                        style={{
+                          backgroundColor: theme.colors.surfaceHover,
+                          color: theme.colors.textSecondary,
+                          borderRadius: '980px',
+                          padding: '3px 10px',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {s}
+                      </span>
                     ))}
                   </div>
                 )}
@@ -123,11 +217,22 @@ function SitRepModal({ sitrep, onClose }) {
           {/* Recommended Interventions */}
           {sitrep.recommended_interventions?.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Recommended Interventions</h3>
-              <ul className="space-y-1">
+              <h3
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '8px',
+                }}
+              >
+                Recommended Interventions
+              </h3>
+              <ul className="space-y-1.5">
                 {sitrep.recommended_interventions.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-slate-300">
-                    <span className="text-green-500 shrink-0 mt-0.5">&#x2022;</span>
+                  <li key={i} className="flex gap-2" style={{ color: theme.colors.text, fontSize: '14px', lineHeight: 1.47 }}>
+                    <span className="shrink-0 mt-0.5" style={{ color: theme.colors.accentGreen }}>&#x2022;</span>
                     {item}
                   </li>
                 ))}
@@ -138,11 +243,22 @@ function SitRepModal({ sitrep, onClose }) {
           {/* Resource Needs */}
           {sitrep.resource_needs?.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Resource Needs</h3>
-              <ul className="space-y-1">
+              <h3
+                style={{
+                  color: theme.colors.textSecondary,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '8px',
+                }}
+              >
+                Resource Needs
+              </h3>
+              <ul className="space-y-1.5">
                 {sitrep.resource_needs.map((item, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-slate-300">
-                    <span className="text-orange-500 shrink-0 mt-0.5">&#x2022;</span>
+                  <li key={i} className="flex gap-2" style={{ color: theme.colors.text, fontSize: '14px', lineHeight: 1.47 }}>
+                    <span className="shrink-0 mt-0.5" style={{ color: theme.colors.accentOrange }}>&#x2022;</span>
                     {item}
                   </li>
                 ))}
@@ -152,9 +268,26 @@ function SitRepModal({ sitrep, onClose }) {
 
           {/* CHW Alert */}
           {sitrep.chw_alert && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-              <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1">CHW Alert Message</h3>
-              <p className="text-sm text-amber-200">{sitrep.chw_alert}</p>
+            <div
+              className="p-4"
+              style={{
+                backgroundColor: theme.severity.warning.bg,
+                borderRadius: theme.radius.md,
+              }}
+            >
+              <h3
+                style={{
+                  color: theme.severity.warning.text,
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  marginBottom: '8px',
+                }}
+              >
+                CHW Alert Message
+              </h3>
+              <p style={{ color: theme.colors.accentOrange, fontSize: '14px', lineHeight: 1.47 }}>{sitrep.chw_alert}</p>
             </div>
           )}
         </div>
@@ -163,102 +296,36 @@ function SitRepModal({ sitrep, onClose }) {
   )
 }
 
-const GI_KEYWORDS = ['diarrhea', 'vomiting', 'dehydration', 'nausea', 'cholera', 'watery']
-const RESP_KEYWORDS = ['cough', 'respiratory', 'sore throat', 'shortness of breath', 'runny nose']
-
-function classifyForCurve(symptomsStr) {
-  if (!symptomsStr) return 'other'
-  const lower = symptomsStr.toLowerCase()
-  if (GI_KEYWORDS.some((k) => lower.includes(k))) return 'gi'
-  if (RESP_KEYWORDS.some((k) => lower.includes(k))) return 'respiratory'
-  return 'other'
-}
-
-function EpiCurve({ encounters, language = 'en' }) {
-  const data = useMemo(() => {
-    const byDate = {}
-    encounters.forEach((enc) => {
-      const date = enc.onset_date || (enc.timestamp ? enc.timestamp.split('T')[0] : null)
-      if (!date) return
-      if (!byDate[date]) byDate[date] = { gi: 0, respiratory: 0, other: 0 }
-      const type = classifyForCurve(enc.symptoms)
-      byDate[date][type]++
-    })
-    return Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, counts]) => ({
-        date: date.slice(5),
-        gi: counts.gi,
-        respiratory: counts.respiratory,
-        other: counts.other,
-        total: counts.gi + counts.respiratory + counts.other,
-      }))
-  }, [encounters])
-
-  if (data.length === 0) return null
-
-  return (
-    <div className="px-3 py-2 border-b border-slate-700/50 shrink-0">
-      <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-        {t(language, 'epiCurve')}
-      </h4>
-      <ResponsiveContainer width="100%" height={80}>
-        <BarChart data={data} margin={{ top: 2, right: 4, bottom: 0, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 8, fill: '#475569' }}
-            axisLine={{ stroke: '#1e293b' }}
-            tickLine={false}
-          />
-          <Tooltip
-            contentStyle={{
-              background: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: 6,
-              fontSize: 11,
-              color: '#e2e8f0',
-            }}
-            labelStyle={{ color: '#94a3b8', fontSize: 10 }}
-          />
-          <ReferenceLine
-            y={2.3}
-            stroke="#475569"
-            strokeDasharray="4 4"
-            label={{ value: 'Baseline', position: 'right', fill: '#475569', fontSize: 8 }}
-          />
-          <Bar dataKey="gi" stackId="a" fill="#ef4444" name="GI / Cholera" />
-          <Bar dataKey="respiratory" stackId="a" fill="#3b82f6" name="Respiratory" />
-          <Bar dataKey="other" stackId="a" fill="#6b7280" name="Other" radius={[2, 2, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="flex items-center gap-3 mt-1 text-[9px] text-slate-500">
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-red-500 rounded-sm" />
-          <span>GI / Cholera</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-blue-500 rounded-sm" />
-          <span>Respiratory</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-gray-500 rounded-sm" />
-          <span>Other</span>
-        </div>
-        <div className="flex items-center gap-1 ml-auto">
-          <div className="w-3 border-t border-dashed border-slate-500" />
-          <span>Baseline</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function AlertPanel({ clusters, encounters = [], language = 'en' }) {
+export default function AlertPanel({ clusters, language = 'en' }) {
   const [sitrep, setSitrep] = useState(null)
   const [loadingId, setLoadingId] = useState(null)
+  const { settings } = useAccessibility()
+  const { speak, enabled: ttsEnabled } = useTTS()
+  const prevCriticalRef = useRef(new Set())
 
   const activeClusters = clusters.filter((c) => c.status === 'active')
+
+  // Auto-read critical alerts via TTS
+  useEffect(() => {
+    if (!settings.ttsAutoRead) return
+    const prevIds = prevCriticalRef.current
+    activeClusters.forEach((cluster) => {
+      if (cluster.anomaly_score > 100 && !prevIds.has(cluster.id)) {
+        const disease = cluster.probable_disease || 'Unknown illness'
+        speak(`Critical alert: ${disease}, ${cluster.case_count} cases detected.`)
+      }
+    })
+    prevCriticalRef.current = new Set(
+      activeClusters.filter((c) => c.anomaly_score > 100).map((c) => c.id)
+    )
+  }, [activeClusters, settings.ttsAutoRead, speak])
+
+  const handleReadAlerts = () => {
+    const text = activeClusters
+      .map((c) => `${c.probable_disease || 'Unknown'}: ${c.case_count} cases, anomaly score ${c.anomaly_score}`)
+      .join('. ')
+    speak(text || 'No active alerts.')
+  }
 
   const handleGenerateSitrep = async (clusterId) => {
     setLoadingId(clusterId)
@@ -278,27 +345,62 @@ export default function AlertPanel({ clusters, encounters = [], language = 'en' 
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950">
+    <div className="h-full flex flex-col" style={{ backgroundColor: theme.colors.bg }}>
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/80 border-b border-slate-700/50 shrink-0">
-        <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+      <div
+        className="flex items-center gap-2 px-4 py-3 shrink-0"
+        style={{
+          backgroundColor: alpha(theme.colors.surface, 0.8),
+        }}
+      >
+        <AlertTriangle className="w-3.5 h-3.5" style={{ color: theme.colors.accentOrange }} aria-hidden="true" />
+        <span
+          style={{
+            color: theme.colors.textSecondary,
+            fontSize: '12px',
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+          }}
+        >
           {t(language, 'activeAlerts')}
         </span>
-        {activeClusters.length > 0 && (
-          <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400">
-            {activeClusters.length}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {ttsEnabled && (
+            <button
+              onClick={handleReadAlerts}
+              aria-label="Read active alerts aloud"
+              className="p-1 rounded btn-icon"
+              style={{ color: theme.colors.textTertiary }}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {activeClusters.length > 0 && (
+            <span
+              style={{
+                backgroundColor: theme.severity.critical.bg,
+                color: theme.severity.critical.text,
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: '980px',
+              }}
+            >
+              {activeClusters.length}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Epidemic Curve */}
-      <EpiCurve encounters={encounters} language={language} />
-
       {/* Alert cards */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-3"
+        aria-live="assertive"
+        aria-label="Active disease alerts"
+      >
         {activeClusters.length === 0 && (
-          <div className="text-slate-600 text-center text-xs mt-6">
+          <div className="text-center mt-6" style={{ color: theme.colors.textTertiary, fontSize: '14px' }}>
             {t(language, 'noActiveClusters')}
           </div>
         )}
@@ -306,44 +408,67 @@ export default function AlertPanel({ clusters, encounters = [], language = 'en' 
           const symptoms = Array.isArray(cluster.dominant_symptoms)
             ? cluster.dominant_symptoms
             : []
+          const isCritical = cluster.anomaly_score > 100
+          const simpleText = settings.simpleView ? simplifyAlertCard(cluster) : null
+
           return (
             <div
               key={cluster.id}
-              className="bg-slate-900 border border-slate-700/50 rounded-lg p-3 space-y-2"
+              role={isCritical ? 'alert' : undefined}
+              aria-label={`${cluster.probable_disease || 'Unknown'} alert: ${cluster.case_count} cases, anomaly score ${cluster.anomaly_score}`}
+              className={`alert-card-hover severity-fade space-y-3 ${isCritical ? 'event-critical' : ''}`}
+              style={{
+                backgroundColor: theme.colors.surface,
+                borderRadius: theme.radius.md,
+                borderLeft: `3px solid ${isCritical ? theme.severity.critical.text : theme.severity.warning.text}`,
+                padding: '20px',
+              }}
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-100 uppercase">
+                <h3 style={{ color: theme.colors.text, fontSize: '17px', fontWeight: 600, textTransform: 'uppercase' }}>
                   {cluster.probable_disease || 'Unknown'}
                 </h3>
-                <SeverityBadge anomalyScore={cluster.anomaly_score} />
+                <SeverityBadge anomalyScore={cluster.anomaly_score} simpleView={settings.simpleView} />
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div>
-                  <div className="text-slate-500">Cases</div>
-                  <div className="text-lg font-bold text-slate-200">{cluster.case_count}</div>
-                </div>
-                <div>
-                  <div className="text-slate-500">Anomaly</div>
-                  <div className="text-lg font-bold text-orange-400 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    {cluster.anomaly_score}x
+              {settings.simpleView ? (
+                <p style={{ color: theme.colors.textSecondary, fontSize: '14px', lineHeight: 1.47 }}>
+                  {simpleText}
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>Cases</div>
+                    <div className="font-bold" style={{ color: theme.colors.text, fontSize: '20px' }}>{cluster.case_count}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>Anomaly</div>
+                    <div className="font-bold flex items-center gap-1" style={{ color: theme.colors.accentOrange, fontSize: '20px' }}>
+                      <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />
+                      {cluster.anomaly_score}x
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>Confidence</div>
+                    <div className="font-bold" style={{ color: theme.colors.text, fontSize: '20px' }}>
+                      {(cluster.confidence * 100).toFixed(0)}%
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-slate-500">Confidence</div>
-                  <div className="text-lg font-bold text-slate-200">
-                    {(cluster.confidence * 100).toFixed(0)}%
-                  </div>
-                </div>
-              </div>
+              )}
 
-              {symptoms.length > 0 && (
-                <div className="flex flex-wrap gap-1">
+              {!settings.simpleView && symptoms.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
                   {symptoms.slice(0, 4).map((s) => (
                     <span
                       key={s}
-                      className="px-1.5 py-0.5 text-[10px] bg-slate-800 text-slate-400 rounded border border-slate-700/50"
+                      style={{
+                        backgroundColor: theme.colors.surfaceHover,
+                        color: theme.colors.textSecondary,
+                        borderRadius: '980px',
+                        padding: '3px 10px',
+                        fontSize: '12px',
+                      }}
                     >
                       {s}
                     </span>
@@ -352,18 +477,28 @@ export default function AlertPanel({ clusters, encounters = [], language = 'en' 
               )}
 
               <div className="flex items-center justify-between">
-                <div className="text-[10px] text-slate-600">
-                  Radius: {cluster.radius_km} km
-                </div>
+                {!settings.simpleView && (
+                  <div style={{ color: theme.colors.textTertiary, fontSize: '13px' }}>
+                    Radius: {cluster.radius_km} km
+                  </div>
+                )}
                 <button
                   onClick={() => handleGenerateSitrep(cluster.id)}
                   disabled={loadingId === cluster.id}
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30 disabled:opacity-50 cursor-pointer transition-colors"
+                  aria-label={`Generate situation report for ${cluster.probable_disease || 'unknown disease'}`}
+                  className="btn-pill flex items-center gap-1.5 ml-auto"
+                  style={{
+                    backgroundColor: alpha(theme.colors.accentGreen, 0.15),
+                    color: theme.colors.accentGreen,
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                  }}
                 >
                   {loadingId === cluster.id ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
                   ) : (
-                    <FileText className="w-3 h-3" />
+                    <FileText className="w-3.5 h-3.5" aria-hidden="true" />
                   )}
                   {t(language, 'generateSitrep')}
                 </button>

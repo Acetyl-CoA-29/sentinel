@@ -29,13 +29,23 @@ backend/
 
 frontend/src/
   App.jsx                    — Main layout, WebSocket, state management, language selector
+  design.js                  — Design system: theme colors, typography, spacing, shadows, glass, alpha() utility
   i18n.js                    — Translations (en, bn, hi, es) + language/speech config
+  index.css                  — Global styles, animations, accessibility CSS (font scaling, high contrast, color blind, focus assist)
   components/
-    map/SurveillanceMap.jsx  — Leaflet map with encounter pins + cluster overlays + legend
-    feed/AgentFeed.jsx       — Real-time agent activity log with color-coded cards
-    alerts/AlertPanel.jsx    — Active cluster alerts + recharts epidemic curve + SitRep modal
-    intake/IntakePanel.jsx   — Text + voice input for CHW encounter reports
-    AgentOrchestration.jsx   — Full-screen SVG pipeline visualization (pentagon layout)
+    map/SurveillanceMap.jsx  — Leaflet map with encounter pins + cluster overlays + frosted legend
+    feed/AgentFeed.jsx       — Real-time agent activity log with color-coded event cards
+    alerts/AlertPanel.jsx    — Active cluster alerts + SitRep modal (frosted glass)
+    intake/IntakePanel.jsx   — Text + voice input pill (frosted glass, 17px input)
+    AgentOrchestration.jsx   — Full-screen SVG pipeline visualization (pentagon layout, soft glow)
+    accessibility/
+      AccessibilityPanel.jsx — Settings slide-out panel (frosted glass, toggles/radio/select)
+      KeyboardShortcuts.jsx  — Keyboard shortcut modal (?, R, D, H, A, Esc)
+      TextToSpeech.jsx       — TTS context provider + useTTS hook
+      VoiceCommands.jsx      — Voice command listener pill (report/demo/contrast/simple/stop)
+      SimpleViewTransforms.js — Plain-language transforms for simple view mode
+  contexts/
+    AccessibilityContext.jsx — Settings state (highContrast, fontSize, colorBlind, focusAssist, tts, voiceCommands, simpleView, language)
 ```
 
 ## Data Model
@@ -110,14 +120,59 @@ Browser Web Speech API for speech-to-text. No Twilio — keep it simple. Languag
 ### WebSocket for real-time feel
 Dashboard connects to /ws/feed on load with auto-reconnect (2s delay). All agent events stream live. Map auto-refreshes when analyst events arrive.
 
-## Design Conventions
-- Theme: dark, surveillance/medical aesthetic (slate-950/900 backgrounds)
-- Agent colors: Intake=#60a5fa (blue), Analyst=#fb923c (orange), Research=#a78bfa (purple), Response=#4ade80 (green), Accessibility=#2dd4bf (teal)
-- Severity colors: critical=red-500, alert=orange-500, warning=amber-500, info=slate-400
-- Agent feed: color-coded cards with icon, label, severity badge, timestamp
-- Map: CARTO dark tiles, red pulsing markers for clusters, blue/gray for individual encounters, translucent circles for cluster radius
-- Cards: dark bg (slate-900), border-slate-700/50, rounded-lg
-- Animations: fadeSlideIn for cards, criticalGlow for alerts, pulseRing for map clusters, agentViewGlow for Agent View button
+## Design System (Phases 1-4 complete)
+
+### Architecture
+- **Single source of truth**: `frontend/src/design.js` exports `theme` and `alpha(hex, opacity)` utility
+- **Hybrid styling**: Tailwind for layout/spacing, inline `style` props for `theme.*` colors. CSS classes for pseudo-states (`:hover`, `:active`, `:focus`) since inline styles can't handle them
+- **CSS custom properties** in `index.css :root` mirror `design.js` for animations/accessibility that need CSS-level access
+- **No hardcoded colors** in any `.jsx` file — all reference `theme.*`
+
+### Theme (Apple-inspired dark)
+- **Backgrounds**: bg=#000, surface=#1C1C1E, surfaceHover=#2C2C2E, surfaceActive=#3A3A3C
+- **Text**: text=#F5F5F7, secondary=#86868B, tertiary=#6E6E73
+- **Accents**: accent=#0A84FF (blue), green=#30D158, red=#FF453A, orange=#FF9F0A
+- **Agent colors**: Intake=#0A84FF, Analyst=#FF9F0A, Research=#BF5AF2, Response=#30D158, Accessibility=#64D2FF
+- **Severity**: Pre-computed `{ bg, text, border }` triplets for critical/alert/warning/moderate/low/clear
+- **Frosted glass**: `rgba(0,0,0,0.72)` + `saturate(180%) blur(20px)` via `theme.glass` + `.frosted-glass` CSS class
+
+### Key CSS Classes (index.css)
+- `.btn-pill` — Apple pill button (980px radius, scale(0.97) active, brightness(1.15) hover, 0.4 opacity disabled)
+- `.btn-icon` — Close/icon button hover (transition bg+color 200ms, hover→surfaceHover)
+- `.card-lift` — Hover lift effect (translateY(-1px) + cardHover shadow, 300ms)
+- `.alert-card-hover` — Alert card bg shift (→surfaceHover on hover + lift)
+- `.frosted-glass` — Backdrop filter blur
+- `.severity-fade` — Cross-fade transition for severity changes (bg/color/border 200ms)
+- `.stagger-1` to `.stagger-5` — Page load fadeUp animation with 50ms delay increments
+- `.view-fade-enter` — 200ms opacity cross-fade for view transitions
+- `.event-card` — 8px slide-up + fade-in (300ms)
+- `.intake-input:focus` — Blue glow replacing default outline
+
+### Layout
+- Header: 48px, frosted glass, SENTINEL 21px/700, nav items 14px/400
+- MetricsBar: frosted glass, 14px font, no dividers
+- Map: 60% width, full bleed, floating frosted-glass legend pill (20px radius)
+- Right sidebar: 40% width, resizable feed/alerts split (drag handle, 20-80%)
+- Agent feed events: 14px radius, 16px padding, 3px left accent, 24x24 icon circles
+- Alert cards: 14px radius, 20px padding, 3px left severity accent, hover bg shift
+- Intake panel: Frosted glass pill (28px radius), 17px input, 40x40 blue submit, 36x36 mic
+- Overlays (modals, panels): All use frosted glass `rgba(28,28,30,0.72)` + backdrop blur, no borders
+
+### Animations
+- Page load: stagger-fade panels from bottom (50ms delay between each, 500ms fadeUp)
+- Agent events: slide-in + smooth auto-scroll (`scrollTo({ behavior: 'smooth' })`)
+- Agent orchestration: Soft glow (3s cycle, stdDeviation 8, floodOpacity 0.35), 1.2s edge flow
+- View transitions: 200ms cross-fade
+- Critical alerts: Pulsing glow (2s criticalGlow)
+- Map clusters: Pulsing ring (2.5s pulseRing)
+
+### Accessibility (CSS)
+- Font scaling: `.font-normal` (14px), `.font-large` (18px), `.font-xlarge` (22px)
+- High contrast: CSS custom property overrides (all text→white, borders→white, surfaces→black)
+- Color blind filters: SVG filter URLs for protanopia/deuteranopia/tritanopia
+- Focus assist: Panel dimming (0.3 opacity) with hover/focus-within restore
+- Focus indicators: 3px solid accent, 2px offset on `:focus-visible`
+- Skip-to-content link
 
 ## Build Status
 All MVP and Should-Have items completed:
