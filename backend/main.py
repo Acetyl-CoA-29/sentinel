@@ -114,7 +114,7 @@ app = FastAPI(title="SENTINEL", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5175", "http://127.0.0.1:5175"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -214,7 +214,9 @@ async def intake(req: IntakeRequest):
     await log_event_async("accessibility", f"Detecting language and input modality for CHW {chw_label}...", "info")
 
     try:
-        extracted = extract_encounter(req.text, req.chw_id, req.lat, req.lng)
+        extracted = await asyncio.to_thread(
+            extract_encounter, req.text, req.chw_id, req.lat, req.lng
+        )
     except Exception as e:
         await log_event_async("intake", f"Extraction failed: {str(e)}", "warning")
         return {"error": f"Failed to extract encounter: {str(e)}"}

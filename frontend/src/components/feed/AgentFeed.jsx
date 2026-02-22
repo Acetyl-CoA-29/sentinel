@@ -7,6 +7,7 @@ import {
   FileText,
   Globe,
 } from 'lucide-react'
+import { t } from '../../i18n'
 
 const AGENT_CONFIG = {
   intake: {
@@ -117,7 +118,7 @@ function EventCard({ event }) {
   )
 }
 
-export default function AgentFeed({ events }) {
+export default function AgentFeed({ events, language = 'en' }) {
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -132,7 +133,7 @@ export default function AgentFeed({ events }) {
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/80 border-b border-slate-700/50 shrink-0">
         <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Agent Activity
+          {t(language, 'agentActivity')}
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           {Object.entries(AGENT_CONFIG).map(([key, cfg]) => (
@@ -154,7 +155,7 @@ export default function AgentFeed({ events }) {
         {events.length === 0 && (
           <div className="text-slate-600 text-center text-xs mt-8 space-y-2">
             <Activity className="w-6 h-6 mx-auto text-slate-700 animate-pulse" />
-            <p>Waiting for agent activity...</p>
+            <p>{t(language, 'waitingForActivity')}</p>
           </div>
         )}
         {events.map((event, i) => (

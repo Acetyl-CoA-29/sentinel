@@ -9,12 +9,14 @@ import {
   Users,
   Zap,
   Play,
+  Languages,
 } from 'lucide-react'
 import SurveillanceMap from './components/map/SurveillanceMap'
 import AgentFeed from './components/feed/AgentFeed'
 import AlertPanel from './components/alerts/AlertPanel'
 import IntakePanel from './components/intake/IntakePanel'
 import AgentOrchestration from './components/AgentOrchestration'
+import { t, LANG_OPTIONS } from './i18n'
 
 const API = 'http://localhost:8111'
 const WS_URL = 'ws://localhost:8111/ws/feed'
@@ -28,7 +30,7 @@ function getThreatLevel(clusters) {
   return { label: 'LOW', cls: 'text-green-400 bg-green-500/10 border-green-500/30' }
 }
 
-function MetricsBar({ encounters, clusters, events }) {
+function MetricsBar({ encounters, clusters, events, language = 'en' }) {
   const activeClusters = clusters.filter((c) => c.status === 'active')
   const threat = getThreatLevel(clusters)
   const lastEvent = events.length > 0 ? events[events.length - 1] : null
@@ -50,7 +52,7 @@ function MetricsBar({ encounters, clusters, events }) {
     <div className="flex items-center gap-4 px-5 py-1.5 bg-slate-900/60 border-b border-slate-700/30 shrink-0 text-[11px]">
       <div className="flex items-center gap-1.5 text-slate-400">
         <Users className="w-3 h-3" />
-        <span className="text-slate-500">Encounters:</span>
+        <span className="text-slate-500">{t(language, 'encounters')}:</span>
         <span className="text-slate-200 font-bold metric-value">{encounters.length}</span>
       </div>
 
@@ -58,7 +60,7 @@ function MetricsBar({ encounters, clusters, events }) {
 
       <div className="flex items-center gap-1.5 text-slate-400">
         <AlertTriangle className="w-3 h-3" />
-        <span className="text-slate-500">Active Clusters:</span>
+        <span className="text-slate-500">{t(language, 'activeClusters')}:</span>
         <span className="text-slate-200 font-bold">{activeClusters.length}</span>
       </div>
 
@@ -66,7 +68,7 @@ function MetricsBar({ encounters, clusters, events }) {
 
       <div className="flex items-center gap-1.5 text-slate-400">
         <Radio className="w-3 h-3 text-green-500" />
-        <span className="text-slate-500">Agents:</span>
+        <span className="text-slate-500">{t(language, 'agents')}:</span>
         <span className="text-green-400 font-bold">5/5 ONLINE</span>
       </div>
 
@@ -74,7 +76,7 @@ function MetricsBar({ encounters, clusters, events }) {
 
       <div className="flex items-center gap-1.5 text-slate-400">
         <Zap className="w-3 h-3" />
-        <span className="text-slate-500">Threat:</span>
+        <span className="text-slate-500">{t(language, 'threat')}:</span>
         <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${threat.cls}`}>
           {threat.label}
         </span>
@@ -84,7 +86,7 @@ function MetricsBar({ encounters, clusters, events }) {
 
       <div className="flex items-center gap-1.5 text-slate-400">
         <Clock className="w-3 h-3" />
-        <span className="text-slate-500">Last Event:</span>
+        <span className="text-slate-500">{t(language, 'lastEvent')}:</span>
         <span className="text-slate-300 font-mono tabular-nums">{lastTime}</span>
       </div>
 
@@ -97,7 +99,7 @@ function MetricsBar({ encounters, clusters, events }) {
                      hover:bg-teal-600/30 disabled:opacity-50 cursor-pointer transition-colors"
         >
           <Globe className="w-3 h-3" />
-          {demoLoading ? 'Running...' : 'Accessibility Demo'}
+          {demoLoading ? t(language, 'running') : t(language, 'accessibilityDemo')}
         </button>
       </div>
     </div>
@@ -218,6 +220,29 @@ export default function App() {
 
   const [demoLoading, setDemoLoading] = useState(false)
   const [showOrchestration, setShowOrchestration] = useState(false)
+  const [language, setLanguage] = useState('en')
+  const [feedSplit, setFeedSplit] = useState(55)
+  const rightColRef = useRef(null)
+
+  const handleDragStart = useCallback((e) => {
+    e.preventDefault()
+    const handleMove = (ev) => {
+      if (!rightColRef.current) return
+      const rect = rightColRef.current.getBoundingClientRect()
+      const pct = Math.max(20, Math.min(80, ((ev.clientY - rect.top) / rect.height) * 100))
+      setFeedSplit(pct)
+    }
+    const handleUp = () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleUp)
+    }
+    document.body.style.cursor = 'row-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleUp)
+  }, [])
 
   const handleRunDemo = useCallback(async () => {
     setDemoLoading(true)
@@ -264,10 +289,22 @@ export default function App() {
             SENTINEL
           </h1>
           <p className="text-[11px] text-slate-400 -mt-0.5 tracking-widest uppercase">
-            Autonomous Community Health Surveillance
+            {t(language, 'subtitle')}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Languages className="w-3.5 h-3.5 text-slate-500" />
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-slate-800 text-slate-300 text-xs border border-slate-700/50 rounded px-2 py-1 outline-none cursor-pointer"
+            >
+              {LANG_OPTIONS.map((opt) => (
+                <option key={opt.code} value={opt.code}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={handleRunDemo}
             disabled={demoLoading}
@@ -276,7 +313,7 @@ export default function App() {
                        hover:bg-red-600/30 disabled:opacity-50 cursor-pointer transition-colors"
           >
             <Play className="w-3.5 h-3.5" />
-            {demoLoading ? 'RUNNING...' : 'RUN FULL DEMO'}
+            {demoLoading ? t(language, 'running') : t(language, 'runDemo')}
           </button>
           <button
             onClick={() => setShowOrchestration(true)}
@@ -288,7 +325,7 @@ export default function App() {
           </button>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Activity className="w-3.5 h-3.5 text-green-500 animate-pulse" />
-            <span>{encounters.length} encounters</span>
+            <span>{encounters.length} {t(language, 'encounters').toLowerCase()}</span>
             <span className="text-slate-700">|</span>
             <span>{clusters.length} clusters</span>
           </div>
@@ -296,25 +333,32 @@ export default function App() {
       </header>
 
       {/* Metrics Bar */}
-      <MetricsBar encounters={encounters} clusters={clusters} events={events} />
+      <MetricsBar encounters={encounters} clusters={clusters} events={events} language={language} />
 
       {/* Main content */}
       <div className="flex flex-1 min-h-0">
         {/* Left: Map (60%) */}
         <div className="w-[60%] relative">
           <SurveillanceMap encounters={encounters} clusters={clusters} />
-          <IntakePanel onSubmit={handleIntakeSubmit} />
+          <IntakePanel onSubmit={handleIntakeSubmit} language={language} />
         </div>
 
-        {/* Right: Feed + Alerts (40%) */}
-        <div className="w-[40%] flex flex-col border-l border-slate-700/50">
+        {/* Right: Feed + Alerts (40%) — resizable */}
+        <div ref={rightColRef} className="w-[40%] flex flex-col border-l border-slate-700/50">
           {/* Top: Agent Feed */}
-          <div className="flex-1 min-h-0 border-b border-slate-700/50">
-            <AgentFeed events={events} />
+          <div style={{ height: `${feedSplit}%` }} className="min-h-0">
+            <AgentFeed events={events} language={language} />
+          </div>
+          {/* Drag handle */}
+          <div
+            onMouseDown={handleDragStart}
+            className="h-1.5 bg-slate-800/80 hover:bg-slate-600 cursor-row-resize shrink-0 flex items-center justify-center group border-y border-slate-700/30"
+          >
+            <div className="w-8 h-0.5 bg-slate-600 group-hover:bg-slate-400 rounded-full transition-colors" />
           </div>
           {/* Bottom: Alerts */}
-          <div className="h-[45%] min-h-0">
-            <AlertPanel clusters={clusters} encounters={encounters} />
+          <div style={{ height: `${100 - feedSplit}%` }} className="min-h-0">
+            <AlertPanel clusters={clusters} encounters={encounters} language={language} />
           </div>
         </div>
       </div>

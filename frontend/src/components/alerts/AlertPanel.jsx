@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 import { AlertTriangle, TrendingUp, FileText, X, Loader2 } from 'lucide-react'
+import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts'
+import { t } from '../../i18n'
 
 const API = 'http://localhost:8111'
 
@@ -172,7 +174,7 @@ function classifyForCurve(symptomsStr) {
   return 'other'
 }
 
-function EpiCurve({ encounters }) {
+function EpiCurve({ encounters, language = 'en' }) {
   const data = useMemo(() => {
     const byDate = {}
     encounters.forEach((enc) => {
@@ -185,72 +187,74 @@ function EpiCurve({ encounters }) {
     return Object.entries(byDate)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, counts]) => ({
-        date,
-        ...counts,
+        date: date.slice(5),
+        gi: counts.gi,
+        respiratory: counts.respiratory,
+        other: counts.other,
         total: counts.gi + counts.respiratory + counts.other,
       }))
   }, [encounters])
 
   if (data.length === 0) return null
 
-  const maxTotal = Math.max(...data.map((d) => d.total), 1)
-  const chartH = 64
-
   return (
     <div className="px-3 py-2 border-b border-slate-700/50 shrink-0">
       <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
-        Epidemic Curve — Cases by Day
+        {t(language, 'epiCurve')}
       </h4>
-      <div className="flex items-end gap-[2px]" style={{ height: chartH }}>
-        {data.map((d) => {
-          const giH = (d.gi / maxTotal) * chartH
-          const respH = (d.respiratory / maxTotal) * chartH
-          const otherH = (d.other / maxTotal) * chartH
-          return (
-            <div
-              key={d.date}
-              className="flex-1 flex flex-col justify-end min-w-0"
-              title={`${d.date}: ${d.total} cases (GI: ${d.gi}, Resp: ${d.respiratory}, Other: ${d.other})`}
-            >
-              {d.other > 0 && (
-                <div className="w-full bg-gray-500/70" style={{ height: otherH }} />
-              )}
-              {d.respiratory > 0 && (
-                <div className="w-full bg-blue-500/70" style={{ height: respH }} />
-              )}
-              {d.gi > 0 && (
-                <div className="w-full bg-red-500/70" style={{ height: giH }} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex gap-[2px] mt-0.5">
-        {data.map((d) => (
-          <div key={d.date} className="flex-1 min-w-0 text-center">
-            <span className="text-[7px] text-slate-600 truncate block">{d.date.slice(5)}</span>
-          </div>
-        ))}
-      </div>
+      <ResponsiveContainer width="100%" height={80}>
+        <BarChart data={data} margin={{ top: 2, right: 4, bottom: 0, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 8, fill: '#475569' }}
+            axisLine={{ stroke: '#1e293b' }}
+            tickLine={false}
+          />
+          <Tooltip
+            contentStyle={{
+              background: '#1e293b',
+              border: '1px solid #334155',
+              borderRadius: 6,
+              fontSize: 11,
+              color: '#e2e8f0',
+            }}
+            labelStyle={{ color: '#94a3b8', fontSize: 10 }}
+          />
+          <ReferenceLine
+            y={2.3}
+            stroke="#475569"
+            strokeDasharray="4 4"
+            label={{ value: 'Baseline', position: 'right', fill: '#475569', fontSize: 8 }}
+          />
+          <Bar dataKey="gi" stackId="a" fill="#ef4444" name="GI / Cholera" />
+          <Bar dataKey="respiratory" stackId="a" fill="#3b82f6" name="Respiratory" />
+          <Bar dataKey="other" stackId="a" fill="#6b7280" name="Other" radius={[2, 2, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
       <div className="flex items-center gap-3 mt-1 text-[9px] text-slate-500">
         <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-red-500/70 rounded-sm" />
+          <div className="w-2 h-2 bg-red-500 rounded-sm" />
           <span>GI / Cholera</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-blue-500/70 rounded-sm" />
+          <div className="w-2 h-2 bg-blue-500 rounded-sm" />
           <span>Respiratory</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-2 h-2 bg-gray-500/70 rounded-sm" />
+          <div className="w-2 h-2 bg-gray-500 rounded-sm" />
           <span>Other</span>
+        </div>
+        <div className="flex items-center gap-1 ml-auto">
+          <div className="w-3 border-t border-dashed border-slate-500" />
+          <span>Baseline</span>
         </div>
       </div>
     </div>
   )
 }
 
-export default function AlertPanel({ clusters, encounters = [] }) {
+export default function AlertPanel({ clusters, encounters = [], language = 'en' }) {
   const [sitrep, setSitrep] = useState(null)
   const [loadingId, setLoadingId] = useState(null)
 
@@ -279,7 +283,7 @@ export default function AlertPanel({ clusters, encounters = [] }) {
       <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/80 border-b border-slate-700/50 shrink-0">
         <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-          Active Alerts
+          {t(language, 'activeAlerts')}
         </span>
         {activeClusters.length > 0 && (
           <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/20 text-red-400">
@@ -289,13 +293,13 @@ export default function AlertPanel({ clusters, encounters = [] }) {
       </div>
 
       {/* Epidemic Curve */}
-      <EpiCurve encounters={encounters} />
+      <EpiCurve encounters={encounters} language={language} />
 
       {/* Alert cards */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {activeClusters.length === 0 && (
           <div className="text-slate-600 text-center text-xs mt-6">
-            No active clusters detected
+            {t(language, 'noActiveClusters')}
           </div>
         )}
         {activeClusters.map((cluster) => {
@@ -361,7 +365,7 @@ export default function AlertPanel({ clusters, encounters = [] }) {
                   ) : (
                     <FileText className="w-3 h-3" />
                   )}
-                  Generate SitRep
+                  {t(language, 'generateSitrep')}
                 </button>
               </div>
             </div>

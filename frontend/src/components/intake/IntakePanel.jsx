@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Mic, MicOff, Loader2 } from 'lucide-react'
+import { t, SPEECH_LANG } from '../../i18n'
 
-export default function IntakePanel({ onSubmit }) {
+export default function IntakePanel({ onSubmit, language = 'en' }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
@@ -48,7 +49,7 @@ export default function IntakePanel({ onSubmit }) {
     const recognition = new SpeechRecognition()
     recognition.continuous = false
     recognition.interimResults = true
-    recognition.lang = 'en-US'
+    recognition.lang = SPEECH_LANG[language] || 'en-US'
     recognitionRef.current = recognition
 
     recognition.onresult = (event) => {
@@ -113,14 +114,14 @@ export default function IntakePanel({ onSubmit }) {
             type="text"
             value={displayText}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Report an encounter... (e.g. 'saw 4 patients with severe watery diarrhea in Old Dhaka today')"
+            placeholder={t(language, 'intakePlaceholder')}
             className="w-full bg-transparent text-sm text-slate-200 placeholder-slate-600 outline-none"
             disabled={loading || listening}
           />
           {listening && (
             <div className="absolute -top-7 left-0 flex items-center gap-1.5 text-[10px] text-red-400">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              Listening... speak your report
+              {t(language, 'listening')}
             </div>
           )}
         </div>
