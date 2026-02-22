@@ -328,17 +328,32 @@ export default function AlertPanel({ clusters, language = 'en' }) {
   }
 
   const handleGenerateSitrep = async (clusterId) => {
-    setLoadingId(clusterId)
+    const id = clusterId || 1
+    setLoadingId(id)
+    setSitrep(null)
     try {
-      const res = await fetch(`${API}/sitrep/${clusterId}`)
+      // Try POST first
+      let res = await fetch(`${API}/generate-sitrep`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cluster_id: id }),
+      })
+      // If POST fails, try GET
+      if (!res.ok && (res.status === 404 || res.status === 405)) {
+        res = await fetch(`${API}/sitrep/${id}`)
+      }
       if (res.ok) {
         const data = await res.json()
         if (!data.error) {
           setSitrep(data)
+        } else {
+          console.error('[SITREP] Backend error:', data.error)
         }
+      } else {
+        console.error('[SITREP] Failed:', res.status)
       }
     } catch (err) {
-      console.error('SitRep fetch failed:', err)
+      console.error('[SITREP] Error:', err)
     } finally {
       setLoadingId(null)
     }

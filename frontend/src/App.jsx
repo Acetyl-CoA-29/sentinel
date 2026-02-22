@@ -269,26 +269,44 @@ export default function App() {
   }, [])
 
   const handleRunDemo = useCallback(async () => {
+    if (demoLoading) return
     setDemoLoading(true)
     try {
-      await fetch(`${API}/intake`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: "This is CHW Fatima in Mirpur-12. I saw 6 patients today, all with severe watery diarrhea and vomiting. Three are children under 5. One elderly woman is severely dehydrated and cannot keep fluids down. They all live near the Bhashantek canal. Symptoms started 2-3 days ago. I've never seen this many cases at once.",
-          lat: 23.8042,
-          lng: 90.3687,
-        }),
-      })
-      fetchData()
-      setTimeout(fetchData, 4000)
-      setTimeout(fetchData, 10000)
+      // Try /demo endpoint first
+      let res
+      try {
+        res = await fetch(`${API}/demo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        })
+      } catch {
+        // Fallback: send directly to /intake
+        res = await fetch(`${API}/intake`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: "This is CHW Fatima in Mirpur-12. I saw 6 patients today, all with severe watery diarrhea and vomiting. Three are children under 5. One elderly woman is severely dehydrated and cannot keep fluids down. They all live near the Bhashantek canal. Symptoms started 2-3 days ago. I've never seen this many cases at once.",
+            chw_id: "CHW-042-FATIMA",
+            lat: 23.8042,
+            lng: 90.3687,
+          }),
+        })
+      }
+      if (res && res.ok) {
+        console.log('[DEMO] Pipeline started')
+        fetchData()
+        setTimeout(fetchData, 4000)
+        setTimeout(fetchData, 10000)
+      } else {
+        console.error('[DEMO] Failed:', res?.status)
+      }
     } catch (err) {
-      console.error('Demo failed:', err)
+      console.error('[DEMO] Error:', err)
     } finally {
-      setTimeout(() => setDemoLoading(false), 2000)
+      // Re-enable after pipeline completes (~15s for all agent steps)
+      setTimeout(() => setDemoLoading(false), 15000)
     }
-  }, [fetchData])
+  }, [fetchData, demoLoading])
 
   const handleCloseModals = useCallback(() => {
     setShowA11yPanel(false)
@@ -300,8 +318,6 @@ export default function App() {
       <div className="h-screen w-screen view-fade-enter" style={{ backgroundColor: theme.colors.bg }}>
         <AgentOrchestration
           events={events}
-          onRunDemo={handleRunDemo}
-          demoLoading={demoLoading}
           onBack={() => setShowOrchestration(false)}
         />
       </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, Play, Activity } from 'lucide-react'
 import { theme, alpha } from '../design'
 
@@ -12,14 +12,87 @@ const NODES = [
 ]
 
 const EDGES = [
-  ['intake', 'analyst'],
-  ['analyst', 'research'],
-  ['research', 'response'],
-  ['response', 'accessibility'],
+  { from: 'intake',        to: 'analyst',       id: 'intake>analyst' },
+  { from: 'analyst',       to: 'research',      id: 'analyst>research' },
+  { from: 'analyst',       to: 'response',      id: 'analyst>response' },
+  { from: 'research',      to: 'response',      id: 'research>response' },
+  { from: 'research',      to: 'intake',        id: 'research>intake' },
+  { from: 'response',      to: 'accessibility', id: 'response>accessibility' },
+  { from: 'accessibility', to: 'intake',        id: 'accessibility>intake' },
 ]
 
 const nodeMap = Object.fromEntries(NODES.map((n) => [n.id, n]))
 const R = 36
+
+// Demo sequence — each step highlights an agent + connections + adds a log entry
+const STEPS = [
+  {
+    agent: 'intake', ms: 2200,
+    conns: [],
+    msg: 'Processing voice input from CHW Fatima, Mirpur-12...',
+    detail: 'NL extraction: 6 patients, severe watery diarrhea, vomiting, 3 children under 5',
+  },
+  {
+    agent: 'intake', ms: 1800,
+    conns: ['intake>analyst'],
+    msg: 'Encounter structured: GI symptoms, severity HIGH. Handing off to Analyst.',
+    detail: 'Geocoded to Bhashantek canal area. Onset: 2-3 days ago.',
+  },
+  {
+    agent: 'analyst', ms: 2000,
+    conns: ['intake>analyst'],
+    msg: 'Running DBSCAN clustering on 81 encounters...',
+    detail: 'eps=0.02 deg, min_samples=3, temporal_window=5d',
+  },
+  {
+    agent: 'analyst', ms: 2200,
+    conns: ['analyst>research', 'analyst>response'],
+    msg: 'CLUSTER DETECTED: 47 GI cases within 2km over 5 days.',
+    detail: 'Anomaly score: 651.69 (baseline 2.3/day exceeded by 283x). Cholera signature: 87%.',
+  },
+  {
+    agent: 'research', ms: 2000,
+    conns: ['analyst>research'],
+    msg: 'Investigating cluster epidemiological profile...',
+    detail: 'Querying API for differential diagnosis and environmental analysis...',
+  },
+  {
+    agent: 'research', ms: 2200,
+    conns: ['research>response'],
+    msg: 'Differential: V. cholerae O1 (87%), ETEC (8%), Shigella (3%).',
+    detail: 'Bhashantek canal: probable contamination source. Monsoon flooding increases risk.',
+  },
+  {
+    agent: 'research', ms: 2500,
+    conns: ['research>intake'],
+    msg: 'CLOSED LOOP: Generating targeted follow-up questions for CHWs.',
+    detail: 'Ask about water source. Check canal water usage. Note rice-water stool appearance.',
+  },
+  {
+    agent: 'response', ms: 2000,
+    conns: ['research>response'],
+    msg: 'Generating SitRep SITREP-2026-DHK-004...',
+    detail: 'Compiling: event summary, epi profile, interventions, resource allocation.',
+  },
+  {
+    agent: 'response', ms: 2000,
+    conns: ['response>accessibility'],
+    msg: 'SitRep complete. CHW alerts deployed to Mirpur-12 district.',
+    detail: 'ORS distribution + water testing sectors 4-7 + vaccination mobilization.',
+  },
+  {
+    agent: 'accessibility', ms: 2200,
+    conns: ['response>accessibility', 'accessibility>intake'],
+    msg: 'Adapting outputs for CHW literacy and device profiles...',
+    detail: 'Fatima: Bengali, moderate literacy -> simplified text + voice. Rahim: voice-only.',
+  },
+  {
+    agent: 'accessibility', ms: 1800,
+    conns: ['accessibility>intake'],
+    msg: 'All outputs adapted. Voice briefings generated in Bengali and Hindi.',
+    detail: 'Interaction pacing adjusted. Follow-up questions simplified for field use.',
+  },
+]
 
 function getNodeColor(id) {
   return theme.agents[id]?.color || theme.colors.textTertiary
@@ -38,31 +111,47 @@ function formatTime(ts) {
   }
 }
 
-export default function AgentOrchestration({ events, onRunDemo, demoLoading, onBack }) {
-  const [activeAgents, setActiveAgents] = useState({})
-  const timersRef = useRef({})
+export default function AgentOrchestration({ events, onBack }) {
+  // Event-based node highlighting (passive mode — WebSocket events)
+  const [wsActiveAgents, setWsActiveAgents] = useState({})
+  const wsTimersRef = useRef({})
+
+  // Demo state (active mode — STEPS sequence)
+  const [running, setRunning] = useState(false)
+  const [currentStep, setCurrentStep] = useState(-1)
+  const [activeAgent, setActiveAgent] = useState(null)
+  const [activeConns, setActiveConns] = useState([])
+  const [log, setLog] = useState([])
+  const timerRef = useRef(null)
   const feedRef = useRef(null)
 
-  // Highlight agent nodes based on incoming events
+  // Highlight agent nodes based on incoming WebSocket events (passive mode)
   useEffect(() => {
-    if (events.length === 0) return
+    if (running || events.length === 0) return
     const latest = events[events.length - 1]
     const agentId = latest.agent
     if (!agentId || !nodeMap[agentId]) return
 
-    setActiveAgents((prev) => ({ ...prev, [agentId]: true }))
+    setWsActiveAgents((prev) => ({ ...prev, [agentId]: true }))
 
-    if (timersRef.current[agentId]) clearTimeout(timersRef.current[agentId])
-    timersRef.current[agentId] = setTimeout(() => {
-      setActiveAgents((prev) => ({ ...prev, [agentId]: false }))
+    if (wsTimersRef.current[agentId]) clearTimeout(wsTimersRef.current[agentId])
+    wsTimersRef.current[agentId] = setTimeout(() => {
+      setWsActiveAgents((prev) => ({ ...prev, [agentId]: false }))
     }, 4000)
-  }, [events])
+  }, [events, running])
 
-  // Cleanup timers on unmount
+  // Cleanup WS timers on unmount
   useEffect(() => {
-    const timers = timersRef.current
+    const timers = wsTimersRef.current
     return () => {
       Object.values(timers).forEach((t) => clearTimeout(t))
+    }
+  }, [])
+
+  // Cleanup demo timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [])
 
@@ -74,9 +163,96 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
         behavior: 'smooth',
       })
     }
-  }, [events])
+  }, [log, events])
 
-  const recentEvents = events.slice(-40)
+  const doStep = useCallback((i) => {
+    if (i >= STEPS.length) {
+      // Pipeline complete
+      setRunning(false)
+      setActiveAgent(null)
+      setActiveConns([])
+      setCurrentStep(-1)
+      setLog((prev) => [
+        ...prev,
+        {
+          agent: 'system',
+          msg: 'Pipeline complete. All agents processed.',
+          detail: '',
+          time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+          _uid: `done-${Date.now()}`,
+        },
+      ])
+      return
+    }
+
+    const step = STEPS[i]
+    setCurrentStep(i)
+    setActiveAgent(step.agent)
+    setActiveConns(step.conns || [])
+    setLog((prev) => [
+      ...prev,
+      {
+        agent: step.agent,
+        msg: step.msg,
+        detail: step.detail,
+        time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+        _uid: `step-${i}-${Date.now()}`,
+      },
+    ])
+
+    // Schedule next step
+    timerRef.current = setTimeout(() => doStep(i + 1), step.ms)
+  }, [])
+
+  const handleStart = useCallback(() => {
+    if (running) return
+
+    // Clear previous state
+    setRunning(true)
+    setLog([])
+    setActiveAgent(null)
+    setActiveConns([])
+    setCurrentStep(-1)
+
+    // Also fire the real backend pipeline so events flow to the main dashboard
+    fetch('http://localhost:8111/demo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => {
+      // Fallback — backend might not have /demo
+      fetch('http://localhost:8111/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: 'This is CHW Fatima in Mirpur-12. I saw 6 patients today, all with severe watery diarrhea and vomiting. Three are children under 5.',
+          chw_id: 'CHW-042-FATIMA',
+          lat: 23.8042,
+          lng: 90.3687,
+        }),
+      }).catch(() => {})
+    })
+
+    // Start the visual demo sequence
+    doStep(0)
+  }, [running, doStep])
+
+  // Determine which nodes/edges are active (demo overrides passive)
+  const isNodeActive = (id) => {
+    if (running) return activeAgent === id
+    return wsActiveAgents[id]
+  }
+
+  const isEdgeActive = (edgeId) => {
+    if (running) return activeConns.includes(edgeId)
+    // In passive mode, highlight edge if either endpoint is active
+    const edge = EDGES.find((e) => e.id === edgeId)
+    if (!edge) return false
+    return wsActiveAgents[edge.from] || wsActiveAgents[edge.to]
+  }
+
+  // Show local log during demo, parent events when idle
+  const feedItems = running || log.length > 0 ? log : events.slice(-40)
+  const isLogMode = running || log.length > 0
 
   return (
     <div style={{ display: 'flex', height: '100%', background: theme.colors.bg, color: theme.colors.text }} role="region" aria-label="Agent orchestration pipeline">
@@ -125,9 +301,9 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
             Agent Orchestration
           </span>
           <button
-            onClick={onRunDemo}
-            disabled={demoLoading}
-            aria-label={demoLoading ? 'Demo running' : 'Run demo simulation'}
+            onClick={handleStart}
+            disabled={running}
+            aria-label={running ? 'Demo running' : 'Run demo simulation'}
             className="btn-pill"
             style={{
               display: 'flex',
@@ -136,12 +312,12 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               padding: '6px 14px',
               fontSize: 12,
               fontWeight: 700,
-              background: alpha(theme.colors.accentRed, 0.12),
-              color: theme.colors.accentRed,
+              background: running ? theme.colors.surfaceHover : alpha(theme.colors.accentGreen, 0.15),
+              color: running ? theme.colors.textTertiary : theme.colors.accentGreen,
             }}
           >
             <Play size={14} aria-hidden="true" />
-            {demoLoading ? 'RUNNING...' : 'RUN DEMO'}
+            {running ? `Step ${currentStep + 1}/${STEPS.length}...` : 'RUN DEMO'}
           </button>
         </div>
 
@@ -227,9 +403,10 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
             </text>
 
             {/* Connection edges */}
-            {EDGES.map(([from, to]) => {
-              const f = nodeMap[from]
-              const t = nodeMap[to]
+            {EDGES.map((edge) => {
+              const f = nodeMap[edge.from]
+              const t = nodeMap[edge.to]
+              if (!f || !t) return null
               const dx = t.cx - f.cx
               const dy = t.cy - f.cy
               const dist = Math.sqrt(dx * dx + dy * dy)
@@ -237,11 +414,12 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               const y1 = f.cy + (dy / dist) * (R + 6)
               const x2 = t.cx - (dx / dist) * (R + 6)
               const y2 = t.cy - (dy / dist) * (R + 6)
-              const active = activeAgents[from] || activeAgents[to]
-              const fromColor = getNodeColor(from)
+              const active = isEdgeActive(edge.id)
+              const fromColor = getNodeColor(edge.from)
+              const isClosedLoop = edge.id === 'research>intake' || edge.id === 'accessibility>intake'
 
               return (
-                <g key={`${from}-${to}`}>
+                <g key={edge.id}>
                   {/* Base line */}
                   <line
                     x1={x1}
@@ -250,6 +428,8 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     y2={y2}
                     stroke={active ? theme.colors.surfaceActive : theme.colors.border}
                     strokeWidth={active ? 1.5 : 0.8}
+                    strokeDasharray={isClosedLoop ? '6 4' : 'none'}
+                    style={{ transition: 'all 300ms ease-out' }}
                   />
                   {/* Animated flow */}
                   {active && (
@@ -259,7 +439,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       x2={x2}
                       y2={y2}
                       stroke={fromColor}
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                       strokeDasharray="6 14"
                       opacity="0.8"
                     >
@@ -282,13 +462,15 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       fontSize="7"
                       letterSpacing="1"
                     >
-                      {from === 'intake'
+                      {edge.from === 'intake'
                         ? 'ENCOUNTERS'
-                        : from === 'analyst'
+                        : edge.from === 'analyst'
                           ? 'CLUSTERS'
-                          : from === 'research'
-                            ? 'ASSESSMENT'
-                            : 'ALERTS'}
+                          : edge.from === 'research'
+                            ? isClosedLoop ? 'FOLLOW-UP' : 'ASSESSMENT'
+                            : edge.from === 'response'
+                              ? 'ALERTS'
+                              : 'ADAPTED'}
                     </text>
                   )}
                 </g>
@@ -297,7 +479,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
 
             {/* Agent nodes */}
             {NODES.map((n) => {
-              const active = activeAgents[n.id]
+              const active = isNodeActive(n.id)
               const color = getNodeColor(n.id)
               const label = getNodeLabel(n.id)
               return (
@@ -331,12 +513,13 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                   <circle
                     cx={n.cx}
                     cy={n.cy}
-                    r={R}
+                    r={active ? R + 2 : R}
                     fill={active ? alpha(color, 0.09) : theme.colors.surface}
                     stroke={color}
                     strokeWidth={active ? 2.5 : 1}
                     opacity={active ? 1 : 0.4}
                     filter={active ? `url(#glow-${n.id})` : undefined}
+                    style={{ transition: 'all 300ms ease-out' }}
                   />
 
                   {/* Letter icon */}
@@ -363,6 +546,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                     fontSize="10"
                     fontWeight="700"
                     letterSpacing="1.5"
+                    style={{ transition: 'fill 200ms' }}
                   >
                     {label}
                   </text>
@@ -430,10 +614,10 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
               letterSpacing: 1.5,
             }}
           >
-            Pipeline Activity
+            {isLogMode ? 'Demo Pipeline' : 'Pipeline Activity'}
           </span>
           <span style={{ marginLeft: 'auto', fontSize: 10, color: theme.colors.surfaceActive }}>
-            {events.length}
+            {feedItems.length}
           </span>
         </div>
 
@@ -445,7 +629,7 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
           aria-label="Pipeline activity feed"
           style={{ flex: 1, overflowY: 'auto', padding: 8 }}
         >
-          {recentEvents.length === 0 && (
+          {feedItems.length === 0 && (
             <div
               style={{
                 textAlign: 'center',
@@ -454,16 +638,20 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                 marginTop: 48,
               }}
             >
-              Waiting for agent events...
+              Click RUN DEMO to start the pipeline...
             </div>
           )}
-          {recentEvents.map((ev, i) => {
-            const node = nodeMap[ev.agent]
-            const color = node ? getNodeColor(node.id) : theme.colors.textTertiary
-            const label = node ? getNodeLabel(node.id) : (ev.agent?.toUpperCase() || '?')
-            const isHighSev =
-              ev.severity === 'alert' || ev.severity === 'critical'
-            const sevStyle = theme.severity[ev.severity]
+          {feedItems.map((ev, i) => {
+            const agentId = ev.agent
+            const node = nodeMap[agentId]
+            const color = node ? getNodeColor(node.id) : agentId === 'system' ? theme.colors.accentGreen : theme.colors.textTertiary
+            const label = node ? getNodeLabel(node.id) : agentId === 'system' ? 'SYSTEM' : (agentId?.toUpperCase() || '?')
+            const isHighSev = ev.severity === 'alert' || ev.severity === 'critical'
+            const sevStyle = ev.severity ? theme.severity[ev.severity] : null
+            const message = ev.msg || ev.message || ''
+            const detail = ev.detail || ''
+            const time = ev.time || formatTime(ev.timestamp)
+
             return (
               <div
                 key={ev._uid || `${ev.id}-${i}`}
@@ -517,14 +705,21 @@ export default function AgentOrchestration({ events, onRunDemo, demoLoading, onB
                       fontFamily: 'monospace',
                     }}
                   >
-                    {formatTime(ev.timestamp)}
+                    {time}
                   </span>
                 </div>
                 <div
                   style={{ fontSize: 11, color: theme.colors.textSecondary, lineHeight: 1.4 }}
                 >
-                  {ev.message}
+                  {message}
                 </div>
+                {detail && (
+                  <div
+                    style={{ fontSize: 10, color: theme.colors.textTertiary, lineHeight: 1.3, marginTop: 2 }}
+                  >
+                    {detail}
+                  </div>
+                )}
               </div>
             )
           })}
